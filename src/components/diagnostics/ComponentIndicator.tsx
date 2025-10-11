@@ -34,12 +34,12 @@ export const ComponentIndicator = ({ icon: Icon, label, status, value }: Compone
       <div className="flex items-center gap-3 mb-2">
         <Icon className="w-6 h-6" />
         <div className="flex-1">
-          <p className="font-semibold text-sm">{label}</p>
-          <p className="text-xs opacity-75">{getStatusText()}</p>
+          <p className="font-semibold text-sm text-white">{label}</p>
+          <p className="text-xs opacity-75 text-white">{getStatusText()}</p>
         </div>
       </div>
       {value && (
-        <p className="text-lg font-mono font-bold mt-2">{value}</p>
+        <p className="text-lg font-mono font-bold mt-2 text-white">{value}</p>
       )}
     </div>
   );
