@@ -142,7 +142,8 @@ export class CapacitorBluetoothService {
   }
   
   // Mock data for testing
-  getMockData(): DiagnosticData {
+  getMockData(systemType: string = 'SKA'): DiagnosticData {
+    const isSKE = systemType.toUpperCase() === 'SKE';
     return {
       // Current measurements
       UP_M1: 27.5,
@@ -165,21 +166,25 @@ export class CapacitorBluetoothService {
       U_nap: 27.4,
       U_davl: 156,
       
-      // Fan counts
-      kUM1_cnd: 2,
+      // Fan counts - SKE has 3 condenser fans, SKA has 2
+      kUM1_cnd: isSKE ? 3 : 2,
       kUM2_isp: 1,
       kUM3_cmp: 1,
       
       // Active fans
-      n_V_cnd: 1,
+      n_V_cnd: isSKE ? 2 : 1,     // SKE: 2 of 3, SKA: 1 of 2
       n_V_isp: 1,
       n_V_cmp: 1,
       
       // PWM Speed
       PWM_spd: 2,
       
-      // Detailed fan status
-      condenserFans: [
+      // Detailed fan status - different for SKE and SKA
+      condenserFans: isSKE ? [
+        { id: 1, status: 'ok' },
+        { id: 2, status: 'ok' },
+        { id: 3, status: 'error', errorMessage: 'Вентилятор конденсатора #3 не работает', repairHint: 'Проверьте питание и контакты вентилятора' }
+      ] : [
         { id: 1, status: 'ok' },
         { id: 2, status: 'error', errorMessage: 'Вентилятор конденсатора #2 не работает', repairHint: 'Проверьте питание и контакты вентилятора' }
       ],

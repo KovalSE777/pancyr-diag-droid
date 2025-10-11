@@ -23,15 +23,15 @@ const Diagnostics = () => {
   useEffect(() => {
     // Load diagnostic data
     if (useMock || !bluetoothService.isConnected()) {
-      // Use mock data
-      setData(bluetoothService.getMockData());
+      // Use mock data with correct system type
+      setData(bluetoothService.getMockData(systemType));
       setIsLive(false);
     } else {
       // TODO: Get real data from Bluetooth
-      setData(bluetoothService.getMockData());
+      setData(bluetoothService.getMockData(systemType));
       setIsLive(true);
     }
-  }, [useMock]);
+  }, [useMock, systemType]);
 
   if (!data) {
     return (
