@@ -11,16 +11,75 @@ import { DiagnosticData } from "@/types/bluetooth";
 import { FanIndicator } from "@/components/diagnostics/FanIndicator";
 import { ComponentIndicator } from "@/components/diagnostics/ComponentIndicator";
 import { FuseIndicator } from "@/components/diagnostics/FuseIndicator";
+import { TestModeControl } from "@/components/diagnostics/TestModeControl";
 import { Capacitor } from "@capacitor/core";
+import { useToast } from "@/hooks/use-toast";
 
 const Diagnostics = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [data, setData] = useState<DiagnosticData | null>(null);
   const [isLive, setIsLive] = useState(false);
+  const { toast } = useToast();
   
   const systemType = searchParams.get('type') || 'ska';
   const useMock = searchParams.get('mock') === 'true';
+
+  const handleTestModeChange = async (enabled: boolean) => {
+    const isNative = Capacitor.isNativePlatform();
+    const service = isNative ? capacitorBluetoothService : bluetoothService;
+    
+    if (!service.isConnected() && !useMock) {
+      toast({
+        title: "Нет подключения",
+        description: "Подключитесь к устройству для управления",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      if (!useMock) {
+        await service.setTestMode(enabled);
+      }
+      toast({
+        title: enabled ? "Тестовый режим включен" : "Тестовый режим выключен",
+        description: enabled 
+          ? "Теперь можно управлять компонентами вручную" 
+          : "Система вернулась в автоматический режим"
+      });
+    } catch (error) {
+      console.error('Failed to toggle test mode:', error);
+      toast({
+        title: "Ошибка",
+        description: "Не удалось переключить режим",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleRelayControl = async (relay: 'M1' | 'M2' | 'M3' | 'M4' | 'M5' | 'CMP', state: boolean) => {
+    const isNative = Capacitor.isNativePlatform();
+    const service = isNative ? capacitorBluetoothService : bluetoothService;
+    
+    if (!service.isConnected() && !useMock) {
+      return;
+    }
+
+    try {
+      if (!useMock) {
+        await service.controlRelays({ [relay]: state });
+      }
+      console.log(`Relay ${relay} set to ${state ? 'ON' : 'OFF'}`);
+    } catch (error) {
+      console.error(`Failed to control relay ${relay}:`, error);
+      toast({
+        title: "Ошибка управления",
+        description: `Не удалось ${state ? 'включить' : 'выключить'} ${relay}`,
+        variant: "destructive"
+      });
+    }
+  };
 
   useEffect(() => {
     const isNative = Capacitor.isNativePlatform();
@@ -115,6 +174,13 @@ const Diagnostics = () => {
       </header>
 
       <main className="container mx-auto px-4 py-6 space-y-6">
+        {/* Test Mode Control */}
+        <TestModeControl 
+          systemType={systemType.toUpperCase() as 'SKA' | 'SKE'}
+          onTestModeChange={handleTestModeChange}
+          onRelayControl={handleRelayControl}
+        />
+
         {/* System Overview */}
         <Card className="p-6 bg-card border-border animate-fade-in">
           <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-foreground">

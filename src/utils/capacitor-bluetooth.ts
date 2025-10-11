@@ -165,6 +165,56 @@ export class CapacitorBluetoothService {
     const commandData = new Uint8Array([0x61, 0x01]);
     await this.sendCommand(0xF1, commandData);
   }
+
+  /**
+   * Переключает тестовый режим (флаг fTEST через бит 0x10 в iDAT_BIT)
+   * @param enabled - включить/выключить тестовый режим
+   */
+  async setTestMode(enabled: boolean): Promise<void> {
+    // Команда управления тестовым режимом
+    const commandData = new Uint8Array([0x62, enabled ? 0x10 : 0x00]);
+    await this.sendCommand(0xF1, commandData);
+  }
+
+  /**
+   * Управление реле в тестовом режиме
+   * @param switches - состояния переключателей (b_switch1 и b_switch2)
+   * 
+   * b_switch1 биты:
+   * - bit 0: test flag
+   * - bit 5: M1 (condenser fan 1)
+   * - bit 6: M2 (condenser fan 2)
+   * - bit 7: M3 (condenser fan 3)
+   * 
+   * b_switch2 биты:
+   * - bit 0: M4 (evaporator fan 1)
+   * - bit 1: M5 (evaporator fan 2)
+   * - bit 2: Compressor
+   */
+  async controlRelays(relays: {
+    M1?: boolean;
+    M2?: boolean;
+    M3?: boolean;
+    M4?: boolean;
+    M5?: boolean;
+    CMP?: boolean;
+  }): Promise<void> {
+    let b_switch1 = 0x01; // Set test bit
+    let b_switch2 = 0x00;
+
+    // Set b_switch1 bits (M1, M2, M3)
+    if (relays.M1) b_switch1 |= 0x20; // bit 5
+    if (relays.M2) b_switch1 |= 0x40; // bit 6
+    if (relays.M3) b_switch1 |= 0x80; // bit 7
+
+    // Set b_switch2 bits (M4, M5, CMP)
+    if (relays.M4) b_switch2 |= 0x01; // bit 0
+    if (relays.M5) b_switch2 |= 0x02; // bit 1
+    if (relays.CMP) b_switch2 |= 0x04; // bit 2
+
+    const commandData = new Uint8Array([0x63, b_switch1, b_switch2]);
+    await this.sendCommand(0xF1, commandData);
+  }
   
   // Mock data for testing
   getMockData(systemType: string = 'SKA'): DiagnosticData {
