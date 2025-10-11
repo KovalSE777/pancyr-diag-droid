@@ -36,7 +36,7 @@ const BluetoothConnect = () => {
 
         setConnectionStatus('connecting');
         
-        const connected = await capacitorBluetoothService.connect();
+        const connected = await capacitorBluetoothService.connect(systemType.toUpperCase() as 'SKA' | 'SKE');
         
         if (connected) {
           setConnectionStatus('connected');
@@ -66,7 +66,7 @@ const BluetoothConnect = () => {
 
         setConnectionStatus('connecting');
         
-        const connected = await bluetoothService.connect();
+        const connected = await bluetoothService.connect(systemType.toUpperCase() as 'SKA' | 'SKE');
         
         if (connected) {
           setConnectionStatus('connected');

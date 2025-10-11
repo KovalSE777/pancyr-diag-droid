@@ -6,10 +6,12 @@ import { Progress } from "@/components/ui/progress";
 import { ArrowLeft, Activity, AlertTriangle, Zap, Thermometer, Gauge, Wind } from "lucide-react";
 import { useEffect, useState } from "react";
 import { bluetoothService } from "@/utils/bluetooth";
+import { capacitorBluetoothService } from "@/utils/capacitor-bluetooth";
 import { DiagnosticData } from "@/types/bluetooth";
 import { FanIndicator } from "@/components/diagnostics/FanIndicator";
 import { ComponentIndicator } from "@/components/diagnostics/ComponentIndicator";
 import { FuseIndicator } from "@/components/diagnostics/FuseIndicator";
+import { Capacitor } from "@capacitor/core";
 
 const Diagnostics = () => {
   const navigate = useNavigate();
@@ -21,15 +23,34 @@ const Diagnostics = () => {
   const useMock = searchParams.get('mock') === 'true';
 
   useEffect(() => {
+    const isNative = Capacitor.isNativePlatform();
+    const service = isNative ? capacitorBluetoothService : bluetoothService;
+    
     // Load diagnostic data
-    if (useMock || !bluetoothService.isConnected()) {
+    if (useMock || !service.isConnected()) {
       // Use mock data with correct system type
-      setData(bluetoothService.getMockData(systemType));
+      setData(service.getMockData(systemType));
       setIsLive(false);
     } else {
-      // TODO: Get real data from Bluetooth
-      setData(bluetoothService.getMockData(systemType));
-      setIsLive(true);
+      // Request real data from Bluetooth
+      service.requestDiagnosticData().then(() => {
+        // Ждем получения данных
+        setTimeout(() => {
+          const liveData = service.getLatestData();
+          if (liveData) {
+            setData(liveData);
+            setIsLive(true);
+          } else {
+            // Если данные не пришли, используем mock
+            setData(service.getMockData(systemType));
+            setIsLive(false);
+          }
+        }, 1000);
+      }).catch(error => {
+        console.error('Failed to request diagnostic data:', error);
+        setData(service.getMockData(systemType));
+        setIsLive(false);
+      });
     }
   }, [useMock, systemType]);
 

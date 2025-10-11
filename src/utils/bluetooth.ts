@@ -1,18 +1,23 @@
 /// <reference path="../types/web-bluetooth.d.ts" />
 import { DiagnosticData, BluetoothPacket } from '@/types/bluetooth';
+import { BluetoothDataParser } from './bluetooth-parser';
 
 export class PantsirBluetoothService {
   private device: any = null;
   private characteristic: any = null;
   private server: any = null;
+  private latestData: DiagnosticData | null = null;
+  private systemType: 'SKA' | 'SKE' = 'SKA';
   
   // UART Service UUID (Nordic UART Service)
   private readonly UART_SERVICE_UUID = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
   private readonly UART_TX_CHAR_UUID = '6e400002-b5a3-f393-e0a9-e50e24dcca9e';
   private readonly UART_RX_CHAR_UUID = '6e400003-b5a3-f393-e0a9-e50e24dcca9e';
   
-  async connect(): Promise<boolean> {
+  async connect(systemType: 'SKA' | 'SKE' = 'SKA'): Promise<boolean> {
     try {
+      this.systemType = systemType;
+      
       // Check if Bluetooth is available
       if (!('bluetooth' in navigator)) {
         throw new Error('Web Bluetooth API not supported');
@@ -45,6 +50,7 @@ export class PantsirBluetoothService {
       this.characteristic.addEventListener('characteristicvaluechanged', 
         this.handleDataReceived.bind(this));
       
+      console.log('Bluetooth connected successfully');
       return true;
     } catch (error) {
       console.error('Bluetooth connection failed:', error);
@@ -79,7 +85,16 @@ export class PantsirBluetoothService {
     if (!value) return;
     
     const data = new Uint8Array(value.buffer);
-    this.parsePacket(data);
+    const packet = this.parsePacket(data);
+    
+    if (packet && packet.screen === 0xF1) {
+      // Парсим диагностические данные
+      const diagnosticData = BluetoothDataParser.parseData(packet.data, this.systemType);
+      if (diagnosticData) {
+        this.latestData = diagnosticData;
+        console.log('Diagnostic data received:', diagnosticData);
+      }
+    }
   }
   
   private parsePacket(data: Uint8Array): BluetoothPacket | null {
@@ -141,6 +156,22 @@ export class PantsirBluetoothService {
     packet[3 + commandData.length] = checksum & 0xFF;
     
     await txCharacteristic.writeValue(packet);
+  }
+  
+  /**
+   * Получает последние полученные диагностические данные
+   */
+  getLatestData(): DiagnosticData | null {
+    return this.latestData;
+  }
+  
+  /**
+   * Запрашивает диагностические данные от БСКУ
+   */
+  async requestDiagnosticData(): Promise<void> {
+    // Отправка команды запроса диагностики (экран 0xF1)
+    const commandData = new Uint8Array([0x61, 0x01]);
+    await this.sendCommand(0xF1, commandData);
   }
   
   // Mock data for testing when Bluetooth is not available

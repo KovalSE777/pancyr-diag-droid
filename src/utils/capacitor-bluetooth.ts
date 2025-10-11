@@ -1,8 +1,11 @@
-import { BleClient, numberToUUID } from '@capacitor-community/bluetooth-le';
+import { BleClient } from '@capacitor-community/bluetooth-le';
 import { DiagnosticData } from '@/types/bluetooth';
+import { BluetoothDataParser } from './bluetooth-parser';
 
 export class CapacitorBluetoothService {
   private deviceId: string | null = null;
+  private latestData: DiagnosticData | null = null;
+  private systemType: 'SKA' | 'SKE' = 'SKA';
   
   // UART Service UUID (Nordic UART Service)
   private readonly UART_SERVICE_UUID = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
@@ -18,8 +21,10 @@ export class CapacitorBluetoothService {
     }
   }
   
-  async connect(): Promise<boolean> {
+  async connect(systemType: 'SKA' | 'SKE' = 'SKA'): Promise<boolean> {
     try {
+      this.systemType = systemType;
+      
       // Initialize BLE
       await this.initialize();
       
@@ -51,6 +56,7 @@ export class CapacitorBluetoothService {
         }
       );
       
+      console.log('Bluetooth connected successfully');
       return true;
     } catch (error) {
       console.error('Bluetooth connection failed:', error);
@@ -74,13 +80,9 @@ export class CapacitorBluetoothService {
   }
   
   private handleDataReceived(value: DataView): void {
-    // Convert DataView to Uint8Array
     const data = new Uint8Array(value.buffer);
-    this.parsePacket(data);
-  }
-  
-  private parsePacket(data: Uint8Array): void {
-    // Check header (0x88)
+    
+    // Проверяем заголовок пакета
     if (data[0] !== 0x88) {
       console.warn('Invalid packet header');
       return;
@@ -88,26 +90,28 @@ export class CapacitorBluetoothService {
     
     const screen = data[1];
     const length = data[2];
-    
-    // Extract data
     const packetData = data.slice(3, 3 + length);
     
-    // Calculate checksum
+    // Проверяем контрольную сумму
     let checksum = 0;
     for (let i = 0; i < 3 + length; i++) {
       checksum += data[i];
     }
     checksum = checksum & 0xFF;
     
-    const receivedChecksum = data[3 + length];
-    
-    if (checksum !== receivedChecksum) {
+    if (checksum !== data[3 + length]) {
       console.warn('Checksum mismatch');
       return;
     }
     
-    // Process packet based on screen number
-    console.log('Received packet from screen:', screen, 'data:', packetData);
+    // Парсим данные диагностики
+    if (screen === 0xF1) {
+      const diagnosticData = BluetoothDataParser.parseData(packetData, this.systemType);
+      if (diagnosticData) {
+        this.latestData = diagnosticData;
+        console.log('Diagnostic data received:', diagnosticData);
+      }
+    }
   }
   
   async sendCommand(screen: number, commandData: Uint8Array): Promise<void> {
@@ -132,13 +136,34 @@ export class CapacitorBluetoothService {
     // Convert to DataView
     const dataView = new DataView(packet.buffer);
     
-    // Write to TX characteristic
-    await BleClient.write(
-      this.deviceId,
-      this.UART_SERVICE_UUID,
-      this.UART_TX_CHAR_UUID,
-      dataView
-    );
+    try {
+      // Write to TX characteristic
+      await BleClient.write(
+        this.deviceId,
+        this.UART_SERVICE_UUID,
+        this.UART_TX_CHAR_UUID,
+        dataView
+      );
+    } catch (error) {
+      console.error('Failed to send command:', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Получает последние полученные диагностические данные
+   */
+  getLatestData(): DiagnosticData | null {
+    return this.latestData;
+  }
+  
+  /**
+   * Запрашивает диагностические данные от БСКУ
+   */
+  async requestDiagnosticData(): Promise<void> {
+    // Отправка команды запроса диагностики (экран 0xF1)
+    const commandData = new Uint8Array([0x61, 0x01]);
+    await this.sendCommand(0xF1, commandData);
   }
   
   // Mock data for testing
