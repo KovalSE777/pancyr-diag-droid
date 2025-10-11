@@ -3,10 +3,13 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, Activity, AlertTriangle, CheckCircle2, XCircle, Zap, Fan, Thermometer } from "lucide-react";
+import { ArrowLeft, Activity, AlertTriangle, Zap, Thermometer, Gauge, Wind } from "lucide-react";
 import { useEffect, useState } from "react";
 import { bluetoothService } from "@/utils/bluetooth";
 import { DiagnosticData } from "@/types/bluetooth";
+import { FanIndicator } from "@/components/diagnostics/FanIndicator";
+import { ComponentIndicator } from "@/components/diagnostics/ComponentIndicator";
+import { FuseIndicator } from "@/components/diagnostics/FuseIndicator";
 
 const Diagnostics = () => {
   const navigate = useNavigate();
@@ -37,14 +40,6 @@ const Diagnostics = () => {
       </div>
     );
   }
-
-  const getStatusColor = (status: boolean) => {
-    return status ? 'text-success' : 'text-destructive';
-  };
-
-  const getStatusIcon = (status: boolean) => {
-    return status ? <CheckCircle2 className="w-5 h-5" /> : <XCircle className="w-5 h-5" />;
-  };
 
   const getModeColor = () => {
     switch (data.mode) {
@@ -99,8 +94,82 @@ const Diagnostics = () => {
       </header>
 
       <main className="container mx-auto px-4 py-6 space-y-6">
-        {/* Voltage Measurements */}
+        {/* Fans Visual Status */}
         <Card className="p-6 bg-card border-border animate-fade-in">
+          <h2 className="text-xl font-bold mb-6 flex items-center gap-2 text-foreground">
+            <Wind className="w-6 h-6 text-primary" />
+            Вентиляторы
+          </h2>
+          <div className="space-y-6">
+            <FanIndicator 
+              fans={data.condenserFans} 
+              label="Конденсатор" 
+            />
+            <FanIndicator 
+              fans={data.evaporatorFans} 
+              label="Испаритель" 
+            />
+            <FanIndicator 
+              fans={data.compressorFans} 
+              label="Компрессор" 
+            />
+          </div>
+        </Card>
+
+        {/* Voltage Drops */}
+        <Card className="p-6 bg-card border-border animate-fade-in [animation-delay:100ms]">
+          <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-foreground">
+            <Zap className="w-5 h-5 text-warning" />
+            Просадки напряжения
+          </h2>
+          <div className="grid grid-cols-3 gap-4">
+            <div className="text-center p-4 rounded-lg bg-background/50">
+              <p className="text-sm text-muted-foreground mb-2">dUM1 (Конд.)</p>
+              <p className="text-3xl font-mono font-bold text-primary">{data.dUP_M1.toFixed(1)}V</p>
+            </div>
+            <div className="text-center p-4 rounded-lg bg-background/50">
+              <p className="text-sm text-muted-foreground mb-2">dUM2 (Исп.)</p>
+              <p className="text-3xl font-mono font-bold text-primary">{data.dUP_M2.toFixed(1)}V</p>
+            </div>
+            <div className="text-center p-4 rounded-lg bg-background/50">
+              <p className="text-sm text-muted-foreground mb-2">dUM3 (Комп.)</p>
+              <p className="text-3xl font-mono font-bold text-primary">{data.dUP_M3.toFixed(1)}V</p>
+            </div>
+          </div>
+        </Card>
+
+        {/* Component Status */}
+        <Card className="p-6 bg-card border-border animate-fade-in [animation-delay:200ms]">
+          <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-foreground">
+            <Thermometer className="w-6 h-6 text-secondary" />
+            Состояние компонентов
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <ComponentIndicator 
+              icon={Gauge}
+              label="Компрессор"
+              status={data.compressorStatus}
+            />
+            <ComponentIndicator 
+              icon={Wind}
+              label="Конденсатор"
+              status={data.condenserStatus}
+            />
+            <ComponentIndicator 
+              icon={Thermometer}
+              label="Испаритель"
+              status={data.evaporatorStatus}
+            />
+            <ComponentIndicator 
+              icon={Gauge}
+              label="Датчик давления"
+              status={data.pressureSensorStatus}
+            />
+          </div>
+        </Card>
+
+        {/* Voltage Measurements */}
+        <Card className="p-6 bg-card border-border animate-fade-in [animation-delay:300ms]">
           <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-foreground">
             <Zap className="w-5 h-5 text-warning" />
             Напряжения
@@ -130,113 +199,33 @@ const Diagnostics = () => {
           </div>
         </Card>
 
-        {/* Voltage Drops */}
-        <Card className="p-6 bg-card border-border animate-fade-in [animation-delay:100ms]">
-          <h2 className="text-xl font-bold mb-4 text-foreground">Просадки напряжения</h2>
-          <div className="grid grid-cols-3 gap-4">
-            <div className="text-center">
-              <p className="text-sm text-muted-foreground mb-1">dUM1 (Конд.)</p>
-              <p className="text-2xl font-mono font-bold text-primary">{data.dUP_M1.toFixed(1)}</p>
-            </div>
-            <div className="text-center">
-              <p className="text-sm text-muted-foreground mb-1">dUM2 (Исп.)</p>
-              <p className="text-2xl font-mono font-bold text-primary">{data.dUP_M2.toFixed(1)}</p>
-            </div>
-            <div className="text-center">
-              <p className="text-sm text-muted-foreground mb-1">dUM3 (Комп.)</p>
-              <p className="text-2xl font-mono font-bold text-primary">{data.dUP_M3.toFixed(1)}</p>
-            </div>
-          </div>
-        </Card>
-
-        {/* Fan Status */}
-        <Card className="p-6 bg-card border-border animate-fade-in [animation-delay:200ms]">
-          <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-foreground">
-            <Fan className="w-5 h-5 text-accent" />
-            Количество вентиляторов
-          </h2>
-          <div className="grid grid-cols-3 gap-4">
-            <div className="text-center">
-              <p className="text-sm text-muted-foreground mb-2">Конденсатор</p>
-              <p className="text-3xl font-bold text-foreground">{data.kUM1_cnd}</p>
-            </div>
-            <div className="text-center">
-              <p className="text-sm text-muted-foreground mb-2">Испаритель</p>
-              <p className="text-3xl font-bold text-foreground">{data.kUM2_isp}</p>
-            </div>
-            <div className="text-center">
-              <p className="text-sm text-muted-foreground mb-2">Компрессор</p>
-              <p className="text-3xl font-bold text-foreground">{data.kUM3_cmp}</p>
-            </div>
-          </div>
-        </Card>
-
-        {/* Component Status */}
-        <Card className="p-6 bg-card border-border animate-fade-in [animation-delay:300ms]">
-          <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-foreground">
-            <Thermometer className="w-5 h-5 text-secondary" />
-            Состояние компонентов
-          </h2>
-          <div className="space-y-3">
-            <div className="flex items-center justify-between p-3 rounded-lg bg-background/50">
-              <span className="text-foreground">Компрессор</span>
-              <div className={`flex items-center gap-2 ${getStatusColor(data.compressorActive)}`}>
-                {getStatusIcon(data.compressorActive)}
-                <span className="font-semibold">{data.compressorActive ? 'Активен' : 'Выкл'}</span>
-              </div>
-            </div>
-            <div className="flex items-center justify-between p-3 rounded-lg bg-background/50">
-              <span className="text-foreground">Конденсатор</span>
-              <div className={`flex items-center gap-2 ${getStatusColor(data.condenserActive)}`}>
-                {getStatusIcon(data.condenserActive)}
-                <span className="font-semibold">{data.condenserActive ? 'Активен' : 'Выкл'}</span>
-              </div>
-            </div>
-            <div className="flex items-center justify-between p-3 rounded-lg bg-background/50">
-              <span className="text-foreground">Испаритель</span>
-              <div className={`flex items-center gap-2 ${getStatusColor(data.evaporatorActive)}`}>
-                {getStatusIcon(data.evaporatorActive)}
-                <span className="font-semibold">{data.evaporatorActive ? 'Активен' : 'Выкл'}</span>
-              </div>
-            </div>
-            <div className="flex items-center justify-between p-3 rounded-lg bg-background/50">
-              <span className="text-foreground">Датчик давления</span>
-              <div className={`flex items-center gap-2 ${getStatusColor(data.pressureSensorOk)}`}>
-                {getStatusIcon(data.pressureSensorOk)}
-                <span className="font-semibold">{data.pressureSensorOk ? 'Исправен' : 'Ошибка'}</span>
-              </div>
-            </div>
-          </div>
-        </Card>
-
         {/* Fuses Status */}
         <Card className="p-6 bg-card border-border animate-fade-in [animation-delay:400ms]">
-          <h2 className="text-xl font-bold mb-4 text-foreground">Предохранители</h2>
+          <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-foreground">
+            <Zap className="w-5 h-5 text-warning" />
+            Предохранители
+          </h2>
           <div className="grid grid-cols-2 gap-3">
-            <div className="flex items-center justify-between p-3 rounded-lg bg-background/50">
-              <span className="text-sm text-foreground">Pr1 (Эталон)</span>
-              <div className={getStatusColor(data.fuseEtalon)}>
-                {getStatusIcon(data.fuseEtalon)}
-              </div>
-            </div>
-            <div className="flex items-center justify-between p-3 rounded-lg bg-background/50">
-              <span className="text-sm text-foreground">Pr2 (Конд.)</span>
-              <div className={getStatusColor(data.fuseCondenser)}>
-                {getStatusIcon(data.fuseCondenser)}
-              </div>
-            </div>
-            <div className="flex items-center justify-between p-3 rounded-lg bg-background/50">
-              <span className="text-sm text-foreground">Pr3 (Исп.)</span>
-              <div className={getStatusColor(data.fuseEvaporator)}>
-                {getStatusIcon(data.fuseEvaporator)}
-              </div>
-            </div>
-            <div className="flex items-center justify-between p-3 rounded-lg bg-background/50">
-              <span className="text-sm text-foreground">Комп.</span>
-              <div className={getStatusColor(data.fuseCompressor)}>
-                {getStatusIcon(data.fuseCompressor)}
-              </div>
-            </div>
+            <FuseIndicator 
+              label="Эталон"
+              status={data.fuseEtalon}
+              code="Pr1"
+            />
+            <FuseIndicator 
+              label="Конденсатор"
+              status={data.fuseCondenser}
+              code="Pr2"
+            />
+            <FuseIndicator 
+              label="Испаритель"
+              status={data.fuseEvaporator}
+              code="Pr3"
+            />
+            <FuseIndicator 
+              label="Компрессор"
+              status={data.fuseCompressor}
+              code="Pr4"
+            />
           </div>
         </Card>
 
@@ -255,7 +244,7 @@ const Diagnostics = () => {
                     <div className="flex-1">
                       <p className="font-semibold text-foreground mb-1">{error.component}</p>
                       <p className="text-sm text-muted-foreground mb-2">{error.description}</p>
-                      <p className="text-sm text-accent">→ {error.suggestedFix}</p>
+                      <p className="text-sm text-accent">💡 {error.suggestedFix}</p>
                     </div>
                   </div>
                 </div>

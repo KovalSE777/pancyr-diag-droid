@@ -1,3 +1,12 @@
+export type ComponentStatus = 'ok' | 'error' | 'off';
+
+export interface FanStatus {
+  id: number;
+  status: ComponentStatus;
+  errorMessage?: string;
+  repairHint?: string;
+}
+
 export interface DiagnosticData {
   // Voltages
   UP_M1: number;  // Voltage measurement 1
@@ -11,17 +20,22 @@ export interface DiagnosticData {
   dUP_M2: number;
   dUP_M3: number;
   
-  // Fan counts
+  // Fan counts and detailed status
   kUM1_cnd: number;  // Condenser fan count
   kUM2_isp: number;  // Evaporator fan count
   kUM3_cmp: number;  // Compressor fan count
   
-  // Status flags
-  compressorActive: boolean;
-  condenserActive: boolean;
-  evaporatorActive: boolean;
-  pressureSensorOk: boolean;
-  softStartOk: boolean;
+  // Detailed fan status for each fan
+  condenserFans: FanStatus[];
+  evaporatorFans: FanStatus[];
+  compressorFans: FanStatus[];
+  
+  // Component status
+  compressorStatus: ComponentStatus;
+  condenserStatus: ComponentStatus;
+  evaporatorStatus: ComponentStatus;
+  pressureSensorStatus: ComponentStatus;
+  softStartStatus: ComponentStatus;
   
   // Fuses status
   fuseEtalon: boolean;  // Pr1

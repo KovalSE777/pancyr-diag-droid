@@ -157,18 +157,41 @@ export class PantsirBluetoothService {
       kUM1_cnd: 2,
       kUM2_isp: 1,
       kUM3_cmp: 1,
-      compressorActive: true,
-      condenserActive: true,
-      evaporatorActive: true,
-      pressureSensorOk: true,
-      softStartOk: true,
+      
+      // Detailed fan status
+      condenserFans: [
+        { id: 1, status: 'ok' },
+        { id: 2, status: 'error', errorMessage: 'Вентилятор конденсатора #2 не работает', repairHint: 'Проверьте питание и контакты вентилятора. Замените вентилятор при необходимости.' }
+      ],
+      evaporatorFans: [
+        { id: 1, status: 'ok' }
+      ],
+      compressorFans: [
+        { id: 1, status: 'ok' }
+      ],
+      
+      // Component status
+      compressorStatus: 'ok',
+      condenserStatus: 'ok',
+      evaporatorStatus: 'ok',
+      pressureSensorStatus: 'ok',
+      softStartStatus: 'ok',
+      
       fuseEtalon: true,
       fuseCondenser: true,
-      fuseEvaporator: true,
+      fuseEvaporator: false, // One fuse failed for demo
       fuseCompressor: true,
       systemType: 'SKE',
       mode: 'cooling',
-      errors: []
+      errors: [
+        {
+          code: 'F03',
+          severity: 'warning',
+          component: 'Предохранитель испарителя (Pr3)',
+          description: 'Предохранитель испарителя перегорел',
+          suggestedFix: 'Замените предохранитель Pr3. Проверьте нагрузку испарителя перед включением.'
+        }
+      ]
     };
   }
 }
