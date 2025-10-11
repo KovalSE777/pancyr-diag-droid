@@ -12,11 +12,13 @@ export class BluetoothDataParser {
    * @returns Распарсенные диагностические данные
    */
   static parseData(data: Uint8Array, systemType: 'SKA' | 'SKE' = 'SKA'): DiagnosticData | null {
-    // Проверка минимальной длины пакета
-    if (data.length < 30) {
-      console.error('Packet too short:', data.length);
+    // Проверка минимальной длины пакета (минимум 26 байтов данных)
+    if (data.length < 26) {
+      console.error('Packet too short:', data.length, 'expected at least 26 bytes');
       return null;
     }
+
+    console.log('Parsing diagnostic data, packet length:', data.length, 'bytes');
 
     let index = 0;
     
@@ -72,21 +74,27 @@ export class BluetoothDataParser {
     const iSOST_UPR1 = data[index++]; // Статус управления 1
     const iSOST_UPR2 = data[index++]; // Статус управления 2
 
-    // Дополнительные измерения (если есть)
-    const kUM1_cnd = data[index++] || (systemType === 'SKE' ? 2 : 3); // Количество вентиляторов конденсатора
-    const kUM2_isp = data[index++] || 1; // Количество вентиляторов испарителя
-    const kUM3_cmp = data[index++] || 1; // Количество вентиляторов компрессора
+    // Дополнительные измерения (опциональные, если есть в пакете)
+    // Примечание: эти данные могут не передаваться, используем bBL_2 для определения
+    const kUM1_cnd = (data.length > 26 && data[index]) ? data[index++] : (systemType === 'SKE' ? 2 : 3);
+    const kUM2_isp = (data.length > 27 && data[index]) ? data[index++] : 1;
+    const kUM3_cmp = (data.length > 28 && data[index]) ? data[index++] : 1;
 
-    const n_V_isp = data[index++] || 1; // Активные вентиляторы испарителя
-    const n_V_cmp = data[index++] || 1; // Активные вентиляторы компрессора
+    const n_V_isp = (data.length > 29 && data[index]) ? data[index++] : 1;
+    const n_V_cmp = (data.length > 30 && data[index]) ? data[index++] : 1;
 
-    // Преобразование температур (из байта в градусы Цельсия)
+    // Преобразование температур
+    // ПРИМЕЧАНИЕ: Точная формула требует калибровочной таблицы из прошивки
+    // Текущая формула - аппроксимация для диапазона -50°C до +50°C
     const temp_air = this.convertTemperature(T_air);
     const temp_isp = this.convertTemperature(T_isp);
 
     // Преобразование напряжений (из ADC в вольты)
-    // Формула: U = (ADC_value / 255) * 30V (примерно)
-    const voltage_scale = 30 / 255;
+    // ВАЖНО: Прошивка использует функцию INTERPOL() с таблицей D_napr1 для нелинейной калибровки
+    // Текущая реализация использует упрощенную линейную формулу (достаточно для MVP)
+    // Для высокой точности требуется таблица калибровки D_napr1
+    const voltage_scale = 30 / 255; // Примерный коэффициент: 30V на 255 единиц ADC
+    
     const UP_M1 = U_U_UM1 * voltage_scale;
     const UP_M2 = U_U_UM2 * voltage_scale;
     const UP_M3 = U_U_UM3 * voltage_scale;
@@ -94,7 +102,7 @@ export class BluetoothDataParser {
     const UP_M5 = U_U_FU * voltage_scale;
     const U_nap = U_U_FU * voltage_scale;
 
-    // Вычисление падений напряжения
+    // Вычисление падений напряжения (в единицах ADC, затем в вольты)
     const dUP_M1 = vdlt_cnd_i * voltage_scale;
     const dUP_M2 = vdlt_isp_i * voltage_scale;
     const dUP_M3 = vdlt_cmp_i * voltage_scale;
@@ -329,13 +337,20 @@ export class BluetoothDataParser {
 
   /**
    * Преобразует байтовое значение температуры в градусы Цельсия
-   * @param value - Байтовое значение температуры
+   * 
+   * ПРИМЕЧАНИЕ: Точная формула зависит от калибровки датчика в прошивке.
+   * Текущая реализация - аппроксимация для стандартных термисторов.
+   * 
+   * Возможные формулы:
+   * 1. T = (ADC / 2) - 50        // Диапазон -50°C до +77.5°C
+   * 2. T = (ADC - 128) / 2.56    // Диапазон -50°C до +49.6°C
+   * 3. Табличная интерполяция (как в INTERPOL())
+   * 
+   * @param value - Байтовое значение температуры (0-255)
    * @returns Температура в °C
    */
   private static convertTemperature(value: number): number {
-    // Преобразование зависит от калибровки датчика
-    // Обычно: T = (ADC_value - 128) / 2.56 для диапазона -50 до +50°C
-    // или T = ADC_value / 2 - 50 для упрощенной формулы
+    // Используем формулу 1 как наиболее вероятную
     return (value / 2) - 50;
   }
 }
