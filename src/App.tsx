@@ -4,6 +4,10 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
+import SystemSelect from "./pages/SystemSelect";
+import BluetoothConnect from "./pages/BluetoothConnect";
+import Diagnostics from "./pages/Diagnostics";
+import RepairGuide from "./pages/RepairGuide";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -16,6 +20,10 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />
+          <Route path="/system-select" element={<SystemSelect />} />
+          <Route path="/bluetooth-connect" element={<BluetoothConnect />} />
+          <Route path="/diagnostics" element={<Diagnostics />} />
+          <Route path="/repair-guide" element={<RepairGuide />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

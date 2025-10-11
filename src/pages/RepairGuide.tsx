@@ -1,0 +1,242 @@
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { ArrowLeft, Search, Wrench, AlertTriangle, CheckCircle2, Fan, Zap } from "lucide-react";
+import { useState } from "react";
+
+interface RepairItem {
+  id: string;
+  title: string;
+  category: 'fuse' | 'fan' | 'compressor' | 'sensor' | 'general';
+  severity: 'critical' | 'warning' | 'info';
+  symptoms: string[];
+  diagnosis: string;
+  solution: string[];
+  tools: string[];
+}
+
+const repairData: RepairItem[] = [
+  {
+    id: 'fuse_pr1',
+    title: 'Отказ предохранителя Pr1 (Эталон)',
+    category: 'fuse',
+    severity: 'critical',
+    symptoms: ['Нет эталонного напряжения', 'Плата управления не работает'],
+    diagnosis: 'Проверить напряжение на предохранителе Pr1. Должно быть 27В.',
+    solution: [
+      'Выключить питание системы',
+      'Визуально осмотреть предохранитель на предмет повреждений',
+      'Проверить мультиметром целостность предохранителя',
+      'Заменить предохранитель на аналогичный',
+      'Включить питание и проверить напряжение'
+    ],
+    tools: ['Мультиметр', 'Отвертка', 'Предохранитель 27В']
+  },
+  {
+    id: 'fan_condenser',
+    title: 'Неисправность вентиляторов конденсатора',
+    category: 'fan',
+    severity: 'warning',
+    symptoms: ['Нет просадки напряжения dUM1', 'Слышен шум', 'Перегрев системы'],
+    diagnosis: 'Измерить просадку напряжения на цепи конденсатора. При исправных вентиляторах должна быть просадка > 0.5В.',
+    solution: [
+      'Проверить визуально вращение вентиляторов',
+      'Измерить напряжение питания вентиляторов',
+      'Проверить целостность проводки',
+      'При необходимости заменить вентилятор',
+      'Проверить крепление и отсутствие посторонних предметов'
+    ],
+    tools: ['Мультиметр', 'Отвертка', 'Запасной вентилятор']
+  },
+  {
+    id: 'compressor_fail',
+    title: 'Отказ компрессора',
+    category: 'compressor',
+    severity: 'critical',
+    symptoms: ['Компрессор не запускается', 'Нет охлаждения', 'Индикация ошибки UCP'],
+    diagnosis: 'Проверить сигналы УПП (устройство плавного пуска). Должны быть активны сигналы HOr и 5bd.',
+    solution: [
+      'Проверить питание компрессора (27В)',
+      'Проверить сигналы УПП',
+      'Проверить термореле перегрева',
+      'Проверить датчик давления',
+      'При необходимости заменить компрессор или УПП'
+    ],
+    tools: ['Мультиметр', 'Манометр', 'Термометр']
+  },
+  {
+    id: 'evaporator_fan',
+    title: 'Неисправность вентилятора испарителя',
+    category: 'fan',
+    severity: 'warning',
+    symptoms: ['Нет воздушного потока', 'Нет просадки dUM2', 'Слабое охлаждение'],
+    diagnosis: 'Проверить работу вентилятора испарителя. Измерить просадку напряжения dUM2.',
+    solution: [
+      'Проверить вращение вентилятора',
+      'Очистить крыльчатку от загрязнений',
+      'Проверить целостность обмоток двигателя',
+      'Проверить предохранитель Pr3',
+      'Заменить вентилятор при необходимости'
+    ],
+    tools: ['Мультиметр', 'Щетка для очистки', 'Запасной вентилятор']
+  },
+  {
+    id: 'pressure_sensor',
+    title: 'Отказ датчика давления',
+    category: 'sensor',
+    severity: 'warning',
+    symptoms: ['Индикация IDD не горит', 'Компрессор не включается'],
+    diagnosis: 'Проверить наличие сигнала от датчика давления. При исправном датчике должна гореть индикация.',
+    solution: [
+      'Проверить электрическое подключение датчика',
+      'Проверить механическое крепление',
+      'Измерить сопротивление датчика',
+      'Проверить давление в системе',
+      'Заменить датчик при необходимости'
+    ],
+    tools: ['Мультиметр', 'Манометр', 'Отвертка']
+  }
+];
+
+const RepairGuide = () => {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const [searchQuery, setSearchQuery] = useState('');
+  
+  const systemType = searchParams.get('type') || 'ska';
+
+  const filteredRepairs = repairData.filter(item =>
+    item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    item.symptoms.some(s => s.toLowerCase().includes(searchQuery.toLowerCase()))
+  );
+
+  const getCategoryIcon = (category: string) => {
+    switch (category) {
+      case 'fuse': return <Zap className="w-5 h-5" />;
+      case 'fan': return <Fan className="w-5 h-5" />;
+      case 'compressor': return <Wrench className="w-5 h-5" />;
+      default: return <AlertTriangle className="w-5 h-5" />;
+    }
+  };
+
+  const getSeverityColor = (severity: string) => {
+    switch (severity) {
+      case 'critical': return 'text-destructive';
+      case 'warning': return 'text-warning';
+      default: return 'text-accent';
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-background pb-20">
+      {/* Header */}
+      <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex items-center justify-between mb-4">
+            <Button 
+              variant="ghost" 
+              onClick={() => navigate(-1)}
+              className="text-foreground hover:text-primary"
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Назад
+            </Button>
+            <h1 className="text-2xl font-bold text-foreground">База знаний</h1>
+            <div className="w-24" />
+          </div>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              type="text"
+              placeholder="Поиск по симптомам или названию..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 bg-background border-border"
+            />
+          </div>
+        </div>
+      </header>
+
+      <main className="container mx-auto px-4 py-6 space-y-4">
+        {filteredRepairs.length === 0 ? (
+          <Card className="p-12 text-center bg-card border-border">
+            <p className="text-muted-foreground">Ничего не найдено. Попробуйте другой запрос.</p>
+          </Card>
+        ) : (
+          filteredRepairs.map((item, index) => (
+            <Card 
+              key={item.id} 
+              className="p-6 bg-card border-border hover:border-primary transition-all duration-300 animate-fade-in cursor-pointer"
+              style={{ animationDelay: `${index * 50}ms` }}
+            >
+              <div className="flex items-start gap-4">
+                <div className={`flex-shrink-0 w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center ${getSeverityColor(item.severity)}`}>
+                  {getCategoryIcon(item.category)}
+                </div>
+                <div className="flex-1 space-y-4">
+                  <div>
+                    <h3 className="text-xl font-bold text-foreground mb-2">{item.title}</h3>
+                    <div className="flex gap-2 mb-3">
+                      <span className={`text-xs px-2 py-1 rounded-full ${
+                        item.severity === 'critical' ? 'bg-destructive/20 text-destructive' :
+                        item.severity === 'warning' ? 'bg-warning/20 text-warning' :
+                        'bg-accent/20 text-accent'
+                      }`}>
+                        {item.severity === 'critical' ? 'Критично' : item.severity === 'warning' ? 'Внимание' : 'Инфо'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="text-sm font-semibold text-foreground mb-2">Симптомы:</p>
+                    <ul className="text-sm text-muted-foreground space-y-1">
+                      {item.symptoms.map((symptom, i) => (
+                        <li key={i}>• {symptom}</li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <div>
+                    <p className="text-sm font-semibold text-foreground mb-2">Диагностика:</p>
+                    <p className="text-sm text-muted-foreground">{item.diagnosis}</p>
+                  </div>
+
+                  <div>
+                    <p className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-success" />
+                      Решение:
+                    </p>
+                    <ol className="text-sm text-muted-foreground space-y-2">
+                      {item.solution.map((step, i) => (
+                        <li key={i} className="flex gap-2">
+                          <span className="flex-shrink-0 w-5 h-5 rounded-full bg-primary/20 text-primary flex items-center justify-center text-xs font-bold">
+                            {i + 1}
+                          </span>
+                          <span>{step}</span>
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
+
+                  <div>
+                    <p className="text-sm font-semibold text-foreground mb-2">Необходимые инструменты:</p>
+                    <div className="flex flex-wrap gap-2">
+                      {item.tools.map((tool, i) => (
+                        <span key={i} className="text-xs px-3 py-1 rounded-full bg-accent/20 text-accent">
+                          {tool}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </Card>
+          ))
+        )}
+      </main>
+    </div>
+  );
+};
+
+export default RepairGuide;
