@@ -4,8 +4,10 @@ import { Card } from "@/components/ui/card";
 import { ArrowLeft, Bluetooth, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 import { useState } from "react";
 import { bluetoothService } from "@/utils/bluetooth";
+import { capacitorBluetoothService } from "@/utils/capacitor-bluetooth";
 import { useToast } from "@/hooks/use-toast";
 import bluetoothIcon from "@/assets/bluetooth-icon.png";
+import { Capacitor } from "@capacitor/core";
 
 const BluetoothConnect = () => {
   const navigate = useNavigate();
@@ -22,35 +24,65 @@ const BluetoothConnect = () => {
     setConnectionStatus('searching');
     
     try {
-      // Check if Web Bluetooth API is available
-      if (!navigator.bluetooth) {
-        throw new Error('Web Bluetooth API не поддерживается в этом браузере');
-      }
-
-      toast({
-        title: "Поиск устройства...",
-        description: "Включите Bluetooth на БСКУ",
-      });
-
-      setConnectionStatus('connecting');
+      // Check if we're running on native platform (iOS/Android)
+      const isNative = Capacitor.isNativePlatform();
       
-      const connected = await bluetoothService.connect();
-      
-      if (connected) {
-        setConnectionStatus('connected');
-        setIsConnected(true);
-        
+      if (isNative) {
+        // Use Capacitor Bluetooth on native platforms
         toast({
-          title: "Подключено успешно",
-          description: "Связь с БСКУ установлена",
+          title: "Поиск устройства...",
+          description: "Включите Bluetooth на БСКУ",
         });
 
-        // Navigate to diagnostics after short delay
-        setTimeout(() => {
-          navigate(`/diagnostics?type=${systemType}`);
-        }, 1500);
+        setConnectionStatus('connecting');
+        
+        const connected = await capacitorBluetoothService.connect();
+        
+        if (connected) {
+          setConnectionStatus('connected');
+          setIsConnected(true);
+          
+          toast({
+            title: "Подключено успешно",
+            description: "Связь с БСКУ установлена",
+          });
+
+          setTimeout(() => {
+            navigate(`/diagnostics?type=${systemType}`);
+          }, 1500);
+        } else {
+          throw new Error('Не удалось подключиться к устройству');
+        }
       } else {
-        throw new Error('Не удалось подключиться к устройству');
+        // Use Web Bluetooth API on web
+        if (!navigator.bluetooth) {
+          throw new Error('Web Bluetooth API не поддерживается в этом браузере. Используйте Chrome на Android или установите мобильное приложение.');
+        }
+
+        toast({
+          title: "Поиск устройства...",
+          description: "Включите Bluetooth на БСКУ",
+        });
+
+        setConnectionStatus('connecting');
+        
+        const connected = await bluetoothService.connect();
+        
+        if (connected) {
+          setConnectionStatus('connected');
+          setIsConnected(true);
+          
+          toast({
+            title: "Подключено успешно",
+            description: "Связь с БСКУ установлена",
+          });
+
+          setTimeout(() => {
+            navigate(`/diagnostics?type=${systemType}`);
+          }, 1500);
+        } else {
+          throw new Error('Не удалось подключиться к устройству');
+        }
       }
     } catch (error) {
       setConnectionStatus('error');
