@@ -223,7 +223,7 @@ export class CapacitorBluetoothService {
       fuseEvaporator: false,
       fuseCompressor: true,
       
-      systemType: 'SKA',
+      systemType: systemType.toUpperCase() as 'SKA' | 'SKE',
       mode: 'cooling',
       sSTATUS: 0x42,
       

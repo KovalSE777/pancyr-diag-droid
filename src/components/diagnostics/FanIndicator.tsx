@@ -10,17 +10,17 @@ interface FanIndicatorProps {
 export const FanIndicator = ({ fans, label }: FanIndicatorProps) => {
   const getStatusColor = (status: FanStatus['status']) => {
     switch (status) {
-      case 'ok': return 'text-green-500';
-      case 'error': return 'text-red-500';
-      case 'off': return 'text-white';
+      case 'ok': return 'text-success';
+      case 'error': return 'text-destructive';
+      case 'off': return 'text-muted-foreground';
     }
   };
 
   const getStatusBgColor = (status: FanStatus['status']) => {
     switch (status) {
-      case 'ok': return 'bg-green-500/20 border-green-500';
-      case 'error': return 'bg-red-500/20 border-red-500 animate-pulse';
-      case 'off': return 'bg-white/10 border-white';
+      case 'ok': return 'bg-success/20 border-success';
+      case 'error': return 'bg-destructive/20 border-destructive animate-pulse';
+      case 'off': return 'bg-muted/20 border-muted';
     }
   };
 

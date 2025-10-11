@@ -12,9 +12,9 @@ interface ComponentIndicatorProps {
 export const ComponentIndicator = ({ icon: Icon, label, status, value }: ComponentIndicatorProps) => {
   const getStatusColor = () => {
     switch (status) {
-      case 'ok': return 'text-green-500 border-green-500 bg-green-500/20';
-      case 'error': return 'text-red-500 border-red-500 bg-red-500/20 animate-pulse';
-      case 'off': return 'text-white border-white bg-white/10';
+      case 'ok': return 'text-success border-success bg-success/20';
+      case 'error': return 'text-destructive border-destructive bg-destructive/20 animate-pulse';
+      case 'off': return 'text-muted-foreground border-muted bg-muted/10';
     }
   };
 
