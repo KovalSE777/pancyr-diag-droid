@@ -25,30 +25,30 @@ export const FanIndicator = ({ fans, label }: FanIndicatorProps) => {
   };
 
   return (
-    <div className="space-y-3">
-      <h3 className="text-sm font-semibold text-muted-foreground">{label}</h3>
-      <div className="flex flex-wrap gap-3">
+    <div className="space-y-4">
+      <h3 className="text-lg font-semibold text-foreground">{label}</h3>
+      <div className="flex gap-6 overflow-x-auto pb-2">
         {fans.map((fan) => (
-          <div key={fan.id} className="space-y-2">
+          <div key={fan.id} className="flex flex-col items-center space-y-3 min-w-fit">
             <div 
               className={cn(
-                "w-16 h-16 rounded-lg border-2 flex items-center justify-center transition-all",
+                "w-32 h-32 rounded-xl border-2 flex items-center justify-center transition-all",
                 getStatusBgColor(fan.status)
               )}
             >
               <Fan 
                 className={cn(
-                  "w-8 h-8 transition-all",
+                  "w-16 h-16 transition-all",
                   getStatusColor(fan.status),
                   fan.status === 'ok' && "animate-spin"
                 )} 
                 style={fan.status === 'ok' ? { animationDuration: '2s' } : {}}
               />
             </div>
-            <p className="text-xs text-center text-muted-foreground">#{fan.id}</p>
+            <p className="text-sm font-medium text-foreground">Вентилятор #{fan.id}</p>
             
             {fan.status === 'error' && (
-              <div className="mt-2 p-3 bg-destructive/10 border border-destructive/30 rounded-lg max-w-xs">
+              <div className="mt-2 p-3 bg-destructive/10 border border-destructive/30 rounded-lg w-64">
                 <p className="text-sm font-semibold text-destructive mb-1">{fan.errorMessage}</p>
                 <p className="text-xs text-muted-foreground">💡 {fan.repairHint}</p>
               </div>
