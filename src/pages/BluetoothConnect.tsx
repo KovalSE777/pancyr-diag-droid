@@ -8,6 +8,7 @@ import { capacitorBluetoothService } from "@/utils/capacitor-bluetooth";
 import { useToast } from "@/hooks/use-toast";
 import bluetoothIcon from "@/assets/bluetooth-icon.png";
 import { Capacitor } from "@capacitor/core";
+import { DebugLogPanel } from "@/components/diagnostics/DebugLogPanel";
 
 const BluetoothConnect = () => {
   const navigate = useNavigate();
@@ -238,6 +239,8 @@ const BluetoothConnect = () => {
           </div>
         </Card>
       </main>
+      
+      <DebugLogPanel />
     </div>
   );
 };

@@ -1,6 +1,7 @@
 import { BleClient } from '@capacitor-community/bluetooth-le';
 import { DiagnosticData } from '@/types/bluetooth';
 import { BluetoothDataParser } from './bluetooth-parser';
+import { logService } from './log-service';
 
 export class CapacitorBluetoothService {
   private deviceId: string | null = null;
@@ -24,6 +25,7 @@ export class CapacitorBluetoothService {
   async connect(systemType: 'SKA' | 'SKE' = 'SKA'): Promise<boolean> {
     try {
       this.systemType = systemType;
+      logService.info('BLE Native', `Starting connection for system type: ${systemType}`);
       console.log('🔵 [BLE Native] Starting connection for system type:', systemType);
       
       // Initialize BLE
@@ -42,6 +44,7 @@ export class CapacitorBluetoothService {
         throw new Error('No device selected');
       }
       
+      logService.success('BLE Native', `Device selected: ${device.name || device.deviceId}`);
       console.log('🔵 [BLE Native] Device selected:', device.name || device.deviceId);
       
       this.deviceId = device.deviceId;
@@ -65,11 +68,16 @@ export class CapacitorBluetoothService {
         }
       );
       
+      logService.success('BLE Native', 'Bluetooth connected successfully');
+      logService.info('BLE Native', `TX UUID: ${this.UART_TX_CHAR_UUID}`);
+      logService.info('BLE Native', `RX UUID: ${this.UART_RX_CHAR_UUID}`);
       console.log('✅ [BLE Native] Bluetooth connected successfully');
       console.log('🔵 [BLE Native] TX UUID:', this.UART_TX_CHAR_UUID);
       console.log('🔵 [BLE Native] RX UUID:', this.UART_RX_CHAR_UUID);
       return true;
     } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      logService.error('BLE Native', `Connection failed: ${errorMsg}`);
       console.error('Bluetooth connection failed:', error);
       return false;
     }
@@ -93,6 +101,7 @@ export class CapacitorBluetoothService {
   private handleDataReceived(value: DataView): void {
     const data = new Uint8Array(value.buffer);
     const hexData = Array.from(data).map(b => b.toString(16).padStart(2, '0').toUpperCase()).join(' ');
+    logService.info('BLE Native', `Raw data received (${data.length} bytes): ${hexData}`);
     console.log('📥 [BLE Native] Raw data received (' + data.length + ' bytes):', hexData);
     
     // Проверяем заголовок пакета
@@ -133,15 +142,19 @@ export class CapacitorBluetoothService {
     
     // Парсим данные диагностики
     if (screen === 0xF1) {
+      logService.success('BLE Native', 'Valid diagnostic packet parsed');
       console.log('📦 [BLE Native] Valid diagnostic packet parsed');
       const diagnosticData = BluetoothDataParser.parseData(packetData, this.systemType);
       if (diagnosticData) {
         this.latestData = diagnosticData;
+        logService.success('BLE Native', 'Diagnostic data parsed successfully');
         console.log('✅ [BLE Native] Diagnostic data parsed successfully:', diagnosticData);
       } else {
+        logService.warn('BLE Native', 'Failed to parse diagnostic data');
         console.warn('⚠️ [BLE Native] Failed to parse diagnostic data');
       }
     } else {
+      logService.info('BLE Native', `Packet received for screen: 0x${screen.toString(16).toUpperCase()}`);
       console.log('📦 [BLE Native] Packet received for screen:', '0x' + screen.toString(16).toUpperCase());
     }
   }
@@ -168,6 +181,7 @@ export class CapacitorBluetoothService {
     const hexPacket = Array.from(packet).map(b => b.toString(16).padStart(2, '0').toUpperCase()).join(' ');
     const hexCommand = Array.from(commandData).map(b => b.toString(16).padStart(2, '0').toUpperCase()).join(' ');
     
+    logService.info('BLE Native', `Sending command to screen 0x${screen.toString(16).toUpperCase()}: [${hexCommand}]`);
     console.log('📤 [BLE Native] Sending command:');
     console.log('  Screen: 0x' + screen.toString(16).toUpperCase());
     console.log('  Command data: [' + hexCommand + ']');
@@ -185,8 +199,11 @@ export class CapacitorBluetoothService {
         this.UART_TX_CHAR_UUID,
         dataView
       );
+      logService.success('BLE Native', 'Command sent successfully');
       console.log('✅ [BLE Native] Command sent successfully');
     } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      logService.error('BLE Native', `Failed to send command: ${errorMsg}`);
       console.error('❌ [BLE Native] Failed to send command:', error);
       throw error;
     }

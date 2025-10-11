@@ -14,6 +14,7 @@ import { FuseIndicator } from "@/components/diagnostics/FuseIndicator";
 import { TestModeControl } from "@/components/diagnostics/TestModeControl";
 import { Capacitor } from "@capacitor/core";
 import { useToast } from "@/hooks/use-toast";
+import { DebugLogPanel } from "@/components/diagnostics/DebugLogPanel";
 
 const Diagnostics = () => {
   const navigate = useNavigate();
@@ -422,6 +423,8 @@ const Diagnostics = () => {
           </Card>
         )}
       </main>
+      
+      <DebugLogPanel />
     </div>
   );
 };

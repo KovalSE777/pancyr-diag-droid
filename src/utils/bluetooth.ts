@@ -1,6 +1,7 @@
 /// <reference path="../types/web-bluetooth.d.ts" />
 import { DiagnosticData, BluetoothPacket } from '@/types/bluetooth';
 import { BluetoothDataParser } from './bluetooth-parser';
+import { logService } from './log-service';
 
 export class PantsirBluetoothService {
   private device: any = null;
@@ -17,6 +18,7 @@ export class PantsirBluetoothService {
   async connect(systemType: 'SKA' | 'SKE' = 'SKA'): Promise<boolean> {
     try {
       this.systemType = systemType;
+      logService.info('BLE', `Starting connection for system type: ${systemType}`);
       console.log('🔵 [BLE] Starting connection for system type:', systemType);
       
       // Check if Bluetooth is available
@@ -24,6 +26,7 @@ export class PantsirBluetoothService {
         throw new Error('Web Bluetooth API not supported');
       }
 
+      logService.info('BLE', `Requesting device with UART service UUID: ${this.UART_SERVICE_UUID}`);
       console.log('🔵 [BLE] Requesting device with UART service UUID:', this.UART_SERVICE_UUID);
       
       // Request Bluetooth device
@@ -35,6 +38,7 @@ export class PantsirBluetoothService {
         optionalServices: [this.UART_SERVICE_UUID]
       });
       
+      logService.success('BLE', `Device selected: ${this.device.name}`);
       console.log('🔵 [BLE] Device selected:', this.device.name);
       
       if (!this.device.gatt) {
@@ -62,11 +66,16 @@ export class PantsirBluetoothService {
       this.characteristic.addEventListener('characteristicvaluechanged', 
         this.handleDataReceived.bind(this));
       
+      logService.success('BLE', 'Bluetooth connected successfully');
+      logService.info('BLE', `TX UUID: ${this.UART_TX_CHAR_UUID}`);
+      logService.info('BLE', `RX UUID: ${this.UART_RX_CHAR_UUID}`);
       console.log('✅ [BLE] Bluetooth connected successfully');
       console.log('🔵 [BLE] TX UUID:', this.UART_TX_CHAR_UUID);
       console.log('🔵 [BLE] RX UUID:', this.UART_RX_CHAR_UUID);
       return true;
     } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      logService.error('BLE', `Connection failed: ${errorMsg}`);
       console.error('Bluetooth connection failed:', error);
       return false;
     }
@@ -100,23 +109,29 @@ export class PantsirBluetoothService {
     
     const data = new Uint8Array(value.buffer);
     const hexData = Array.from(data).map(b => b.toString(16).padStart(2, '0').toUpperCase()).join(' ');
+    logService.info('BLE', `Raw data received (${data.length} bytes): ${hexData}`);
     console.log('📥 [BLE] Raw data received (' + data.length + ' bytes):', hexData);
     
     const packet = this.parsePacket(data);
     
     if (packet && packet.screen === 0xF1) {
+      logService.success('BLE', 'Valid diagnostic packet parsed');
       console.log('📦 [BLE] Valid diagnostic packet parsed');
       // Парсим диагностические данные
       const diagnosticData = BluetoothDataParser.parseData(packet.data, this.systemType);
       if (diagnosticData) {
         this.latestData = diagnosticData;
+        logService.success('BLE', 'Diagnostic data parsed successfully');
         console.log('✅ [BLE] Diagnostic data parsed successfully:', diagnosticData);
       } else {
+        logService.warn('BLE', 'Failed to parse diagnostic data');
         console.warn('⚠️ [BLE] Failed to parse diagnostic data');
       }
     } else if (!packet) {
+      logService.warn('BLE', 'Failed to parse packet');
       console.warn('⚠️ [BLE] Failed to parse packet');
     } else {
+      logService.info('BLE', `Packet received for screen: 0x${packet.screen.toString(16).toUpperCase()}`);
       console.log('📦 [BLE] Packet received for screen:', '0x' + packet.screen.toString(16).toUpperCase());
     }
   }
@@ -124,6 +139,7 @@ export class PantsirBluetoothService {
   private parsePacket(data: Uint8Array): BluetoothPacket | null {
     // Check header
     if (data[0] !== 0x88) {
+      logService.warn('BLE', `Invalid packet header: 0x${data[0].toString(16).toUpperCase()} (expected 0x88)`);
       console.warn('⚠️ [BLE] Invalid packet header: 0x' + data[0].toString(16).toUpperCase() + ' (expected 0x88)');
       return null;
     }
@@ -193,6 +209,7 @@ export class PantsirBluetoothService {
     const hexPacket = Array.from(packet).map(b => b.toString(16).padStart(2, '0').toUpperCase()).join(' ');
     const hexCommand = Array.from(commandData).map(b => b.toString(16).padStart(2, '0').toUpperCase()).join(' ');
     
+    logService.info('BLE', `Sending command to screen 0x${screen.toString(16).toUpperCase()}: [${hexCommand}]`);
     console.log('📤 [BLE] Sending command:');
     console.log('  Screen: 0x' + screen.toString(16).toUpperCase());
     console.log('  Command data: [' + hexCommand + ']');
@@ -200,6 +217,7 @@ export class PantsirBluetoothService {
     console.log('  Checksum: 0x' + (checksum & 0xFF).toString(16).toUpperCase());
     
     await txCharacteristic.writeValue(packet);
+    logService.success('BLE', 'Command sent successfully');
     console.log('✅ [BLE] Command sent successfully');
   }
   
