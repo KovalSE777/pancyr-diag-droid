@@ -71,7 +71,7 @@ export const TestModeControl = ({
     const allOn: RelayState = {
       M1: true,
       M2: true,
-      M3: systemType === 'SKA', // SKA has 3 condenser fans
+      M3: systemType === 'SKE', // SKE has 3 condenser fans
       M4: true,
       M5: false, // Usually only 1 evaporator fan
       CMP: true
@@ -133,7 +133,7 @@ export const TestModeControl = ({
               <Wind className="w-5 h-5 text-primary" />
               <h3 className="font-semibold text-foreground">Конденсатор</h3>
               <Badge variant="secondary">
-                {systemType === 'SKA' ? '3 вентилятора' : '2 вентилятора'}
+                {systemType === 'SKE' ? '3 вентилятора' : '2 вентилятора'}
               </Badge>
             </div>
             <div className="grid grid-cols-3 gap-3">
@@ -149,7 +149,7 @@ export const TestModeControl = ({
                 active={relays.M2}
                 onToggle={() => handleRelayToggle('M2')}
               />
-              {systemType === 'SKA' && (
+              {systemType === 'SKE' && (
                 <RelayControl
                   label="M3"
                   name="Вент. 3"

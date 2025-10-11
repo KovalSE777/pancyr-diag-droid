@@ -250,29 +250,28 @@ export class PantsirBluetoothService {
       U_nap: 27.4,    // Power supply voltage
       U_davl: 156,    // Pressure sensor (0-255)
       
-      // Fan counts - CRITICAL FIX: SKA has 3 condenser fans, SKE has 2
-      // From C code: bBL_2=0 (SKA/Аппарат) => 3 fans (M1,M2,M3)
-      //              bBL_2=1 (SKE/Экипаж) => 2 fans (M1,M2)
-      kUM1_cnd: isSKE ? 2 : 3,
+      // Fan counts - Updated mapping: SKE (Экипаж) has 3 condenser fans, SKA (Аппарат) has 2
+      // From C code variant: bBL_2 mapping refined per latest files
+      kUM1_cnd: isSKE ? 3 : 2,
       kUM2_isp: 1,
       kUM3_cmp: 1,
       
-      // Active fans
-      n_V_cnd: isSKE ? 1 : 2,     // SKA: 2 of 3, SKE: 1 of 2 condenser fans working
+      // Active fans (mock)
+      n_V_cnd: isSKE ? 2 : 1,     // SKE: 2 of 3, SKA: 1 of 2 condenser fans working
       n_V_isp: 1,
       n_V_cmp: 1,
       
       // PWM Speed
       PWM_spd: 2,     // Fast speed
       
-      // Detailed fan status - SKA has 3 fans, SKE has 2
+      // Detailed fan status - SKE has 3 fans, SKA has 2
       condenserFans: isSKE ? [
-        { id: 1, status: 'ok' },
-        { id: 2, status: 'error', errorMessage: 'Вентилятор конденсатора #2 не работает', repairHint: 'Проверьте питание и контакты вентилятора. Замените вентилятор при необходимости.' }
-      ] : [
         { id: 1, status: 'ok' },
         { id: 2, status: 'ok' },
         { id: 3, status: 'error', errorMessage: 'Вентилятор конденсатора #3 не работает', repairHint: 'Проверьте питание и контакты вентилятора. Замените вентилятор при необходимости.' }
+      ] : [
+        { id: 1, status: 'ok' },
+        { id: 2, status: 'error', errorMessage: 'Вентилятор конденсатора #2 не работает', repairHint: 'Проверьте питание и контакты вентилятора. Замените вентилятор при необходимости.' }
       ],
       evaporatorFans: [
         { id: 1, status: 'ok' }

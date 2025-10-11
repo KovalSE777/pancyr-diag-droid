@@ -75,8 +75,8 @@ export class BluetoothDataParser {
     const iSOST_UPR2 = data[index++]; // Статус управления 2
 
     // Дополнительные измерения (опциональные, если есть в пакете)
-    // Примечание: эти данные могут не передаваться, используем bBL_2 для определения
-    const kUM1_cnd = (data.length > 26 && data[index]) ? data[index++] : (systemType === 'SKA' ? 3 : 2);
+    // Примечание: эти данные могут не передаваться, используем systemType для определения
+    const kUM1_cnd = (data.length > 26 && data[index]) ? data[index++] : (systemType === 'SKA' ? 2 : 3);
     const kUM2_isp = (data.length > 27 && data[index]) ? data[index++] : 1;
     const kUM3_cmp = (data.length > 28 && data[index]) ? data[index++] : 1;
 
@@ -106,7 +106,7 @@ export class BluetoothDataParser {
     // Парсинг статусных битов
     const bD_DAVL = !!(sDAT_BIT & 0x01);   // Датчик давления
     const bVKL_CMP = !!(sDAT_BIT & 0x02);  // Компрессор включен
-    const bBL_2 = !!(sDAT_BIT & 0x04);     // Тип системы (0=СКА Аппарат 3 венттилятора, 1=СКЭ Экипаж 2 вентилятора)
+    const bBL_2 = !!(sDAT_BIT & 0x04);     // Тип системы (0=СКА Аппарат 2 вентилятора, 1=СКЭ Экипаж 3 вентилятора)
     const bK_NORM = !!(sDAT_BIT & 0x08);   // Норма конденсатора
     const bFTD_NORM = !!(sDAT_BIT & 0x10); // Норма фотодатчика
     const bBL2_1vnt = !!(sDAT_BIT & 0x20); // 1 вентилятор испарителя
