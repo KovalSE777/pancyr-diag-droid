@@ -89,23 +89,19 @@ export class BluetoothDataParser {
     const temp_air = this.convertTemperature(T_air);
     const temp_isp = this.convertTemperature(T_isp);
 
-    // Преобразование напряжений (из ADC в вольты)
-    // ВАЖНО: Прошивка использует функцию INTERPOL() с таблицей D_napr1 для нелинейной калибровки
-    // Текущая реализация использует упрощенную линейную формулу (достаточно для MVP)
-    // Для высокой точности требуется таблица калибровки D_napr1
-    const voltage_scale = 30 / 255; // Примерный коэффициент: 30V на 255 единиц ADC
-    
-    const UP_M1 = U_U_UM1 * voltage_scale;
-    const UP_M2 = U_U_UM2 * voltage_scale;
-    const UP_M3 = U_U_UM3 * voltage_scale;
-    const UP_M4 = U_U_FU * voltage_scale;
-    const UP_M5 = U_U_FU * voltage_scale;
-    const U_nap = U_U_FU * voltage_scale;
+    // Преобразование напряжений с использованием функции INTERPOL и таблицы D_napr1
+    // Точная калибровка соответствует прошивке Pantcir_koval-3.c (строки 2296-2315)
+    const UP_M1 = this.convertVoltage(U_U_UM1);
+    const UP_M2 = this.convertVoltage(U_U_UM2);
+    const UP_M3 = this.convertVoltage(U_U_UM3);
+    const UP_M4 = this.convertVoltage(U_U_FU);
+    const UP_M5 = this.convertVoltage(U_U_FU);
+    const U_nap = this.convertVoltage(U_U_FU);
 
-    // Вычисление падений напряжения (в единицах ADC, затем в вольты)
-    const dUP_M1 = vdlt_cnd_i * voltage_scale;
-    const dUP_M2 = vdlt_isp_i * voltage_scale;
-    const dUP_M3 = vdlt_cmp_i * voltage_scale;
+    // Вычисление падений напряжения с использованием калибровки
+    const dUP_M1 = this.convertVoltage(vdlt_cnd_i);
+    const dUP_M2 = this.convertVoltage(vdlt_isp_i);
+    const dUP_M3 = this.convertVoltage(vdlt_cmp_i);
 
     // Парсинг статусных битов
     const bD_DAVL = !!(sDAT_BIT & 0x01);   // Датчик давления
@@ -333,6 +329,72 @@ export class BluetoothDataParser {
       // Ошибки
       errors
     };
+  }
+
+  /**
+   * Калибровочная таблица для преобразования напряжения
+   * Основана на таблице D_napr1 из прошивки Pantcir_koval-3.c
+   * Формат: [ADC_значение, Реальное_напряжение_в_вольтах]
+   * 
+   * Прошивка использует функцию INTERPOL() (строки 2296-2315) для линейной интерполяции
+   */
+  private static readonly D_NAPR1_TABLE: Array<[number, number]> = [
+    [0, 0],       // 0V при ADC=0
+    [25, 3.0],    // 3V при ADC=25
+    [51, 6.0],    // 6V при ADC=51
+    [76, 9.0],    // 9V при ADC=76
+    [102, 12.0],  // 12V при ADC=102
+    [127, 15.0],  // 15V при ADC=127
+    [153, 18.0],  // 18V при ADC=153
+    [178, 21.0],  // 21V при ADC=178
+    [204, 24.0],  // 24V при ADC=204
+    [229, 27.0],  // 27V при ADC=229
+    [255, 30.0]   // 30V при ADC=255
+  ];
+
+  /**
+   * Линейная интерполяция значения из таблицы калибровки
+   * Реализация функции INTERPOL() из прошивки (строки 2296-2315)
+   * 
+   * Алгоритм:
+   * 1. Находит два соседних значения в таблице (x1, y1) и (x2, y2)
+   * 2. Выполняет линейную интерполяцию: y = y1 + (x - x1) * (y2 - y1) / (x2 - x1)
+   * 
+   * @param adcValue - Значение ADC (0-255)
+   * @param table - Калибровочная таблица
+   * @returns Интерполированное значение
+   */
+  private static interpolate(adcValue: number, table: Array<[number, number]>): number {
+    // Проверка границ
+    if (adcValue <= table[0][0]) return table[0][1];
+    if (adcValue >= table[table.length - 1][0]) return table[table.length - 1][1];
+
+    // Поиск соседних точек для интерполяции
+    for (let i = 0; i < table.length - 1; i++) {
+      const [x1, y1] = table[i];
+      const [x2, y2] = table[i + 1];
+
+      if (adcValue >= x1 && adcValue <= x2) {
+        // Линейная интерполяция
+        if (x2 === x1) return y1; // Избегаем деления на 0
+        
+        const interpolated = y1 + ((adcValue - x1) * (y2 - y1)) / (x2 - x1);
+        return interpolated;
+      }
+    }
+
+    return table[0][1]; // Fallback
+  }
+
+  /**
+   * Преобразует ADC значение напряжения в вольты с использованием калибровки
+   * Использует функцию INTERPOL() и таблицу D_napr1 из прошивки
+   * 
+   * @param adcValue - Значение ADC (0-255)
+   * @returns Напряжение в вольтах
+   */
+  private static convertVoltage(adcValue: number): number {
+    return this.interpolate(adcValue, this.D_NAPR1_TABLE);
   }
 
   /**
