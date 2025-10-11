@@ -24,9 +24,13 @@ export class CapacitorBluetoothService {
   async connect(systemType: 'SKA' | 'SKE' = 'SKA'): Promise<boolean> {
     try {
       this.systemType = systemType;
+      console.log('🔵 [BLE Native] Starting connection for system type:', systemType);
       
       // Initialize BLE
       await this.initialize();
+      console.log('🔵 [BLE Native] BLE initialized');
+      
+      console.log('🔵 [BLE Native] Requesting device with UART service UUID:', this.UART_SERVICE_UUID);
       
       // Request device with filter
       const device = await BleClient.requestDevice({
@@ -38,15 +42,20 @@ export class CapacitorBluetoothService {
         throw new Error('No device selected');
       }
       
+      console.log('🔵 [BLE Native] Device selected:', device.name || device.deviceId);
+      
       this.deviceId = device.deviceId;
       
       // Connect to device
+      console.log('🔵 [BLE Native] Connecting to device...');
       await BleClient.connect(this.deviceId, () => {
-        console.log('Device disconnected');
+        console.log('❌ [BLE Native] Device disconnected');
         this.deviceId = null;
       });
+      console.log('🔵 [BLE Native] Device connected');
       
       // Start notifications
+      console.log('🔵 [BLE Native] Starting notifications on RX characteristic:', this.UART_RX_CHAR_UUID);
       await BleClient.startNotifications(
         this.deviceId,
         this.UART_SERVICE_UUID,
@@ -56,7 +65,9 @@ export class CapacitorBluetoothService {
         }
       );
       
-      console.log('Bluetooth connected successfully');
+      console.log('✅ [BLE Native] Bluetooth connected successfully');
+      console.log('🔵 [BLE Native] TX UUID:', this.UART_TX_CHAR_UUID);
+      console.log('🔵 [BLE Native] RX UUID:', this.UART_RX_CHAR_UUID);
       return true;
     } catch (error) {
       console.error('Bluetooth connection failed:', error);
@@ -81,16 +92,25 @@ export class CapacitorBluetoothService {
   
   private handleDataReceived(value: DataView): void {
     const data = new Uint8Array(value.buffer);
+    const hexData = Array.from(data).map(b => b.toString(16).padStart(2, '0').toUpperCase()).join(' ');
+    console.log('📥 [BLE Native] Raw data received (' + data.length + ' bytes):', hexData);
     
     // Проверяем заголовок пакета
     if (data[0] !== 0x88) {
-      console.warn('Invalid packet header');
+      console.warn('⚠️ [BLE Native] Invalid packet header: 0x' + data[0].toString(16).toUpperCase() + ' (expected 0x88)');
       return;
     }
     
     const screen = data[1];
     const length = data[2];
     const packetData = data.slice(3, 3 + length);
+    
+    console.log('📦 [BLE Native] Parsing packet: Header=0x' + data[0].toString(16).toUpperCase() + 
+                ', Screen=0x' + screen.toString(16).toUpperCase() + 
+                ', Length=' + length);
+    
+    const hexPacketData = Array.from(packetData).map(b => b.toString(16).padStart(2, '0').toUpperCase()).join(' ');
+    console.log('📦 [BLE Native] Packet data (' + length + ' bytes):', hexPacketData);
     
     // Проверяем контрольную сумму
     let checksum = 0;
@@ -99,18 +119,30 @@ export class CapacitorBluetoothService {
     }
     checksum = checksum & 0xFF;
     
-    if (checksum !== data[3 + length]) {
-      console.warn('Checksum mismatch');
+    const receivedChecksum = data[3 + length];
+    
+    console.log('🔐 [BLE Native] Checksum: calculated=0x' + checksum.toString(16).toUpperCase() + 
+                ', received=0x' + receivedChecksum.toString(16).toUpperCase());
+    
+    if (checksum !== receivedChecksum) {
+      console.warn('❌ [BLE Native] Checksum mismatch! Packet corrupted.');
       return;
     }
     
+    console.log('✅ [BLE Native] Packet valid');
+    
     // Парсим данные диагностики
     if (screen === 0xF1) {
+      console.log('📦 [BLE Native] Valid diagnostic packet parsed');
       const diagnosticData = BluetoothDataParser.parseData(packetData, this.systemType);
       if (diagnosticData) {
         this.latestData = diagnosticData;
-        console.log('Diagnostic data received:', diagnosticData);
+        console.log('✅ [BLE Native] Diagnostic data parsed successfully:', diagnosticData);
+      } else {
+        console.warn('⚠️ [BLE Native] Failed to parse diagnostic data');
       }
+    } else {
+      console.log('📦 [BLE Native] Packet received for screen:', '0x' + screen.toString(16).toUpperCase());
     }
   }
   
@@ -133,6 +165,15 @@ export class CapacitorBluetoothService {
     }
     packet[3 + commandData.length] = checksum & 0xFF;
     
+    const hexPacket = Array.from(packet).map(b => b.toString(16).padStart(2, '0').toUpperCase()).join(' ');
+    const hexCommand = Array.from(commandData).map(b => b.toString(16).padStart(2, '0').toUpperCase()).join(' ');
+    
+    console.log('📤 [BLE Native] Sending command:');
+    console.log('  Screen: 0x' + screen.toString(16).toUpperCase());
+    console.log('  Command data: [' + hexCommand + ']');
+    console.log('  Full packet (' + packet.length + ' bytes): [' + hexPacket + ']');
+    console.log('  Checksum: 0x' + (checksum & 0xFF).toString(16).toUpperCase());
+    
     // Convert to DataView
     const dataView = new DataView(packet.buffer);
     
@@ -144,8 +185,9 @@ export class CapacitorBluetoothService {
         this.UART_TX_CHAR_UUID,
         dataView
       );
+      console.log('✅ [BLE Native] Command sent successfully');
     } catch (error) {
-      console.error('Failed to send command:', error);
+      console.error('❌ [BLE Native] Failed to send command:', error);
       throw error;
     }
   }
