@@ -218,7 +218,7 @@ export class PantsirBluetoothService {
       fuseEvaporator: false, // One fuse failed for demo
       fuseCompressor: true,
       
-      systemType: 'SKE',
+      systemType: 'SKA',
       mode: 'cooling',
       sSTATUS: 0x42,      // System status byte
       

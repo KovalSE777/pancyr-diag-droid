@@ -88,7 +88,7 @@ const Diagnostics = () => {
             </div>
           </div>
           <h1 className="text-2xl font-bold text-foreground text-center">
-            {data.systemType === 'SKA' ? 'СКА' : 'СКЭ'} - Диагностика
+            {systemType.toUpperCase()} - Диагностика
           </h1>
         </div>
       </header>
