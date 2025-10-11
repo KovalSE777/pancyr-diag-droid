@@ -32,20 +32,20 @@ export const FanIndicator = ({ fans, label }: FanIndicatorProps) => {
           <div key={fan.id} className="flex flex-col items-center space-y-3 min-w-fit">
             <div 
               className={cn(
-                "w-32 h-32 rounded-xl border-2 flex items-center justify-center transition-all",
+                "w-40 h-40 rounded-xl border-2 flex items-center justify-center transition-all",
                 getStatusBgColor(fan.status)
               )}
             >
               <Fan 
                 className={cn(
-                  "w-16 h-16 transition-all",
+                  "w-20 h-20 transition-all",
                   getStatusColor(fan.status),
                   fan.status === 'ok' && "animate-spin"
                 )} 
                 style={fan.status === 'ok' ? { animationDuration: '2s' } : {}}
               />
             </div>
-            <p className="text-sm font-medium text-foreground">Вентилятор #{fan.id}</p>
+            <p className="text-base font-medium text-foreground">Вентилятор #{fan.id}</p>
             
             {fan.status === 'error' && (
               <div className="mt-2 p-3 bg-destructive/10 border border-destructive/30 rounded-lg w-64">
