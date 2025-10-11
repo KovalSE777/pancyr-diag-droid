@@ -100,19 +100,25 @@ const Diagnostics = () => {
             <Wind className="w-6 h-6 text-primary" />
             Вентиляторы
           </h2>
-          <div className="flex flex-col lg:flex-row gap-8 overflow-x-auto">
-            <FanIndicator 
-              fans={data.condenserFans} 
-              label="Конденсатор" 
-            />
-            <FanIndicator 
-              fans={data.evaporatorFans} 
-              label="Испаритель" 
-            />
-            <FanIndicator 
-              fans={data.compressorFans} 
-              label="Компрессор" 
-            />
+          <div className="flex flex-col lg:flex-row gap-8">
+            <div className="flex-1">
+              <FanIndicator 
+                fans={data.condenserFans} 
+                label="Конденсатор" 
+              />
+            </div>
+            <div className="flex-1">
+              <FanIndicator 
+                fans={data.evaporatorFans} 
+                label="Испаритель" 
+              />
+            </div>
+            <div className="flex-1">
+              <FanIndicator 
+                fans={data.compressorFans} 
+                label="Компрессор" 
+              />
+            </div>
           </div>
         </Card>
 
