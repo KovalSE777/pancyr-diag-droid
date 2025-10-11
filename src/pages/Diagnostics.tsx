@@ -94,30 +94,79 @@ const Diagnostics = () => {
       </header>
 
       <main className="container mx-auto px-4 py-6 space-y-6">
-        {/* Fans Visual Status */}
+        {/* System Overview */}
         <Card className="p-6 bg-card border-border animate-fade-in">
-          <h2 className="text-xl font-bold mb-6 flex items-center gap-2 text-foreground">
-            <Wind className="w-6 h-6 text-primary" />
-            Вентиляторы
+          <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-foreground">
+            <Thermometer className="w-6 h-6 text-primary" />
+            Общие параметры
           </h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="p-4 rounded-lg bg-background/50 text-center">
+              <p className="text-xs text-muted-foreground mb-1">Температура воздуха</p>
+              <p className="text-2xl font-mono font-bold text-foreground">{data.T_air.toFixed(1)}°C</p>
+            </div>
+            <div className="p-4 rounded-lg bg-background/50 text-center">
+              <p className="text-xs text-muted-foreground mb-1">Температура испарителя</p>
+              <p className="text-2xl font-mono font-bold text-foreground">{data.T_isp.toFixed(1)}°C</p>
+            </div>
+            <div className="p-4 rounded-lg bg-background/50 text-center">
+              <p className="text-xs text-muted-foreground mb-1">Напряжение питания</p>
+              <p className="text-2xl font-mono font-bold text-foreground">{data.U_nap.toFixed(1)}V</p>
+            </div>
+            <div className="p-4 rounded-lg bg-background/50 text-center">
+              <p className="text-xs text-muted-foreground mb-1">Давление</p>
+              <p className="text-2xl font-mono font-bold text-foreground">{((data.U_davl / 255) * 100).toFixed(0)}%</p>
+            </div>
+          </div>
+        </Card>
+
+        {/* Fans Visual Status */}
+        <Card className="p-6 bg-card border-border animate-fade-in [animation-delay:50ms]">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-bold flex items-center gap-2 text-foreground">
+              <Wind className="w-6 h-6 text-primary" />
+              Вентиляторы
+            </h2>
+            <div className="flex items-center gap-4 text-sm">
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground">Скорость:</span>
+                <Badge variant={data.PWM_spd === 2 ? "default" : "secondary"}>
+                  {data.PWM_spd === 2 ? 'Быстро' : 'Медленно'}
+                </Badge>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground">Активных:</span>
+                <Badge variant="outline">{data.n_V_cnd + data.n_V_isp + data.n_V_cmp}</Badge>
+              </div>
+            </div>
+          </div>
           <div className="flex flex-col lg:flex-row gap-8">
             <div className="flex-1">
               <FanIndicator 
                 fans={data.condenserFans} 
                 label="Конденсатор" 
               />
+              <p className="text-center text-sm text-muted-foreground mt-2">
+                Активно: {data.n_V_cnd} из {data.kUM1_cnd}
+              </p>
             </div>
             <div className="flex-1">
               <FanIndicator 
                 fans={data.evaporatorFans} 
                 label="Испаритель" 
               />
+              <p className="text-center text-sm text-muted-foreground mt-2">
+                Активно: {data.n_V_isp} из {data.kUM2_isp}
+              </p>
             </div>
             <div className="flex-1">
               <FanIndicator 
                 fans={data.compressorFans} 
                 label="Компрессор" 
               />
+              <p className="text-center text-sm text-muted-foreground mt-2">
+                Активно: {data.n_V_cmp} из {data.kUM3_cmp}
+              </p>
             </div>
           </div>
         </Card>
@@ -145,68 +194,95 @@ const Diagnostics = () => {
         </Card>
 
         {/* Component Status */}
-        <Card className="p-6 bg-card border-border animate-fade-in [animation-delay:200ms]">
+        <Card className="p-6 bg-card border-border animate-fade-in [animation-delay:150ms]">
           <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-foreground">
-            <Thermometer className="w-6 h-6 text-secondary" />
+            <Gauge className="w-6 h-6 text-secondary" />
             Состояние компонентов
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             <ComponentIndicator 
               icon={Gauge}
               label="Компрессор"
               status={data.compressorStatus}
+              value={data.obr_COMP ? 'Обрыв' : data.zmk_COMP ? 'Замыкание' : undefined}
             />
             <ComponentIndicator 
               icon={Wind}
               label="Конденсатор"
               status={data.condenserStatus}
+              value={data.obr_V_knd1 ? 'Обрыв вент.' : undefined}
             />
             <ComponentIndicator 
               icon={Thermometer}
               label="Испаритель"
               status={data.evaporatorStatus}
+              value={data.obr_V_isp1 ? 'Обрыв вент.' : undefined}
             />
             <ComponentIndicator 
               icon={Gauge}
               label="Датчик давления"
               status={data.pressureSensorStatus}
+              value={`${((data.U_davl / 255) * 100).toFixed(0)}%`}
             />
+            <ComponentIndicator 
+              icon={Zap}
+              label="Мягкий пуск"
+              status={data.softStartStatus}
+            />
+            <div className="p-4 rounded-lg border-2 border-border bg-background/50">
+              <p className="text-sm font-semibold text-white mb-2">Статус системы</p>
+              <p className="text-lg font-mono font-bold text-primary">0x{data.sSTATUS.toString(16).toUpperCase().padStart(2, '0')}</p>
+            </div>
           </div>
         </Card>
 
         {/* Voltage Measurements */}
-        <Card className="p-6 bg-card border-border animate-fade-in [animation-delay:300ms]">
+        <Card className="p-6 bg-card border-border animate-fade-in [animation-delay:200ms]">
           <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-foreground">
             <Zap className="w-5 h-5 text-warning" />
-            Напряжения
+            Токи измерения
           </h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">UP_M1 (Эталон)</span>
+                <span className="text-muted-foreground">UP_M1</span>
                 <span className="font-mono font-bold text-foreground">{data.UP_M1.toFixed(1)}V</span>
               </div>
               <Progress value={(data.UP_M1 / 30) * 100} className="h-2" />
             </div>
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">UP_M2 (Испаритель)</span>
+                <span className="text-muted-foreground">UP_M2</span>
                 <span className="font-mono font-bold text-foreground">{data.UP_M2.toFixed(1)}V</span>
               </div>
               <Progress value={(data.UP_M2 / 30) * 100} className="h-2" />
             </div>
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">UP_M3 (Компрессор)</span>
+                <span className="text-muted-foreground">UP_M3</span>
                 <span className="font-mono font-bold text-foreground">{data.UP_M3.toFixed(1)}V</span>
               </div>
               <Progress value={(data.UP_M3 / 30) * 100} className="h-2" />
+            </div>
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">UP_M4</span>
+                <span className="font-mono font-bold text-foreground">{data.UP_M4.toFixed(1)}V</span>
+              </div>
+              <Progress value={(data.UP_M4 / 30) * 100} className="h-2" />
+            </div>
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">UP_M5</span>
+                <span className="font-mono font-bold text-foreground">{data.UP_M5.toFixed(1)}V</span>
+              </div>
+              <Progress value={(data.UP_M5 / 30) * 100} className="h-2" />
             </div>
           </div>
         </Card>
 
         {/* Fuses Status */}
-        <Card className="p-6 bg-card border-border animate-fade-in [animation-delay:400ms]">
+        <Card className="p-6 bg-card border-border animate-fade-in [animation-delay:250ms]">
           <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-foreground">
             <Zap className="w-5 h-5 text-warning" />
             Предохранители
@@ -237,7 +313,7 @@ const Diagnostics = () => {
 
         {/* Errors */}
         {data.errors.length > 0 && (
-          <Card className="p-6 bg-destructive/10 border-destructive animate-fade-in [animation-delay:500ms]">
+          <Card className="p-6 bg-destructive/10 border-destructive animate-fade-in [animation-delay:300ms]">
             <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-destructive">
               <AlertTriangle className="w-5 h-5" />
               Ошибки ({data.errors.length})

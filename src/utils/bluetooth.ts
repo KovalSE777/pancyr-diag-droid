@@ -146,17 +146,39 @@ export class PantsirBluetoothService {
   // Mock data for testing when Bluetooth is not available
   getMockData(): DiagnosticData {
     return {
+      // Current measurements
       UP_M1: 27.5,
       UP_M2: 26.8,
       UP_M3: 27.1,
       UP_M4: 27.3,
       UP_M5: 27.0,
+      
+      // Voltage drops
       dUP_M1: 1.2,
       dUP_M2: 0.8,
       dUP_M3: 1.5,
+      
+      // Temperatures
+      T_air: 22.5,    // Air temperature
+      T_isp: -5.2,    // Evaporator temperature
+      T_kmp: 45.8,    // Compressor temperature
+      
+      // System voltages and pressure
+      U_nap: 27.4,    // Power supply voltage
+      U_davl: 156,    // Pressure sensor (0-255)
+      
+      // Fan counts
       kUM1_cnd: 2,
       kUM2_isp: 1,
       kUM3_cmp: 1,
+      
+      // Active fans
+      n_V_cnd: 1,     // 1 of 2 condenser fans working
+      n_V_isp: 1,
+      n_V_cmp: 1,
+      
+      // PWM Speed
+      PWM_spd: 2,     // Fast speed
       
       // Detailed fan status
       condenserFans: [
@@ -177,12 +199,29 @@ export class PantsirBluetoothService {
       pressureSensorStatus: 'ok',
       softStartStatus: 'ok',
       
+      // Component diagnostics (zmk/obr)
+      zmk_V_isp1: false,
+      obr_V_isp1: false,
+      zmk_V_knd1: false,
+      obr_V_knd1: true,   // Condenser fan 2 has break
+      zmk_COMP: false,
+      obr_COMP: false,
+      
+      // Working modes
+      work_rej_cnd: 2,    // Working
+      work_rej_isp: 2,    // Working
+      work_rej_cmp: 2,    // Working
+      
+      // Fuses
       fuseEtalon: true,
       fuseCondenser: true,
       fuseEvaporator: false, // One fuse failed for demo
       fuseCompressor: true,
+      
       systemType: 'SKE',
       mode: 'cooling',
+      sSTATUS: 0x42,      // System status byte
+      
       errors: [
         {
           code: 'F03',
