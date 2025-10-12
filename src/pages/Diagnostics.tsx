@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, Activity, AlertTriangle, Zap, Thermometer, Gauge, Wind } from "lucide-react";
+import { ArrowLeft, Activity, AlertTriangle, Zap, Thermometer, Gauge, Wind, BookOpen } from "lucide-react";
 import { useEffect, useState } from "react";
 import { bluetoothService } from "@/utils/bluetooth";
 import { capacitorBluetoothService } from "@/utils/capacitor-bluetooth";
@@ -158,6 +158,16 @@ const Diagnostics = () => {
               <span className="hidden sm:inline">Назад</span>
             </Button>
             <div className="flex items-center gap-1 sm:gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate(`/repair-guide?type=${systemType}`)}
+                className="text-xs sm:text-sm px-2 sm:px-3 border-accent text-accent hover:bg-accent/10"
+              >
+                <BookOpen className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+                <span className="hidden sm:inline">База знаний</span>
+                <span className="sm:hidden">База</span>
+              </Button>
               {isLive && (
                 <Badge variant="outline" className="border-success text-success text-[10px] sm:text-xs px-1.5 sm:px-2">
                   <Activity className="w-2 h-2 sm:w-3 sm:h-3 mr-0.5 sm:mr-1 animate-pulse" />
