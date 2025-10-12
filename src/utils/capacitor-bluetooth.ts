@@ -35,9 +35,8 @@ export class CapacitorBluetoothService {
       console.log('🔵 [BLE Native] Requesting device with UART service UUID:', this.UART_SERVICE_UUID);
       
       // Request device with filter
-      // Запрос устройства - покажет все BLE устройства с UART сервисом
+      // Запрос устройства - покажет ВСЕ доступные Bluetooth устройства
       const device = await BleClient.requestDevice({
-        services: [this.UART_SERVICE_UUID],
         optionalServices: [this.UART_SERVICE_UUID]
       });
       

@@ -30,10 +30,9 @@ export class PantsirBluetoothService {
       console.log('🔵 [BLE] Requesting device with UART service UUID:', this.UART_SERVICE_UUID);
       
       // Request Bluetooth device
+      // Запрос устройства - покажет ВСЕ доступные Bluetooth устройства
       this.device = await (navigator as any).bluetooth.requestDevice({
-        filters: [
-          { services: [this.UART_SERVICE_UUID] }
-        ],
+        acceptAllDevices: true,
         optionalServices: [this.UART_SERVICE_UUID]
       });
       
