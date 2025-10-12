@@ -2,9 +2,34 @@ import { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'app.lovable.ba41ab0de47a46879e70cd17cee4dfd3',
-  appName: 'pancyr-diag-droid',
+  appName: 'БСКУ Диагностика',
   webDir: 'dist',
   bundledWebRuntime: false,
+  
+  // Настройки иконки и splash screen
+  android: {
+    icon: {
+      sources: ['public/app-icon.png']
+    },
+    splash: {
+      backgroundColor: '#0a0f1a',
+      image: 'public/splash.png',
+      imageWidth: 1080,
+      imageHeight: 1920
+    }
+  },
+  
+  ios: {
+    icon: {
+      sources: ['public/app-icon.png']
+    },
+    splash: {
+      backgroundColor: '#0a0f1a',
+      image: 'public/splash.png',
+      imageWidth: 1080,
+      imageHeight: 1920
+    }
+  },
   // ВАЖНО: Для production APK закомментируй server.url
   // Раскомментируй только для разработки с hot reload
   // server: {
