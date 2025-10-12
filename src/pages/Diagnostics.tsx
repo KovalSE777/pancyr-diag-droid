@@ -11,6 +11,7 @@ import { DiagnosticData } from "@/types/bluetooth";
 import { FanIndicator } from "@/components/diagnostics/FanIndicator";
 import { ComponentIndicator } from "@/components/diagnostics/ComponentIndicator";
 import { FuseIndicator } from "@/components/diagnostics/FuseIndicator";
+import { SoftStartSignals } from "@/components/diagnostics/SoftStartSignals";
 import { TestModeControl } from "@/components/diagnostics/TestModeControl";
 import { Capacitor } from "@capacitor/core";
 import { useToast } from "@/hooks/use-toast";
@@ -288,12 +289,22 @@ const Diagnostics = () => {
             Состояние компонентов
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            <ComponentIndicator 
-              icon={Gauge}
-              label="Компрессор"
-              status={data.compressorStatus}
-              value={data.obr_COMP ? 'Обрыв' : data.zmk_COMP ? 'Замыкание' : undefined}
-            />
+            <div className="lg:col-span-2 md:col-span-1">
+              <ComponentIndicator 
+                icon={Gauge}
+                label="Компрессор"
+                status={data.compressorStatus}
+                value={data.obr_COMP ? 'Обрыв' : data.zmk_COMP ? 'Замыкание' : undefined}
+              />
+              {data.compressorStatus === 'ok' && (
+                <div className="mt-2">
+                  <SoftStartSignals 
+                    signal_SVD={data.signal_SVD}
+                    signal_ContactNorm={data.signal_ContactNorm}
+                  />
+                </div>
+              )}
+            </div>
             <ComponentIndicator 
               icon={Wind}
               label="Конденсатор"

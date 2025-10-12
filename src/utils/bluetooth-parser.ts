@@ -316,7 +316,12 @@ export class BluetoothDataParser {
       fuseCondenser,
       fuseEvaporator,
       fuseCompressor,
-
+      
+      // Soft start signals (УПП) - extract from control bits if available
+      // TODO: Map these from actual firmware bits when available
+      signal_SVD: !obr_COMP,          // Assume SVD signal present if compressor circuit OK
+      signal_ContactNorm: !obr_COMP,  // Assume contact normal if compressor circuit OK
+      
       // Тип системы
       systemType,
 

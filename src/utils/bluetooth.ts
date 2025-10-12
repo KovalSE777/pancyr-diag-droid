@@ -367,6 +367,10 @@ export class PantsirBluetoothService {
       fuseEvaporator: false, // One fuse failed for demo
       fuseCompressor: true,
       
+      // Soft start signals (УПП) - simulating compressor startup sequence
+      signal_SVD: true,           // Photodiode signal (1st signal)
+      signal_ContactNorm: true,   // Contact normal (2nd signal after SVD)
+      
       systemType: systemType.toUpperCase() as 'SKA' | 'SKE',
       mode: 'cooling',
       sSTATUS: 0x42,      // System status byte

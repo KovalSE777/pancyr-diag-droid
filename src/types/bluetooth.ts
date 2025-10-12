@@ -73,6 +73,10 @@ export interface DiagnosticData {
   fuseEvaporator: boolean;// Pr3
   fuseCompressor: boolean;// Pr4
   
+  // Soft start signals (УПП)
+  signal_SVD: boolean;     // Signal from photodiode (1st signal)
+  signal_ContactNorm: boolean;  // Contact normal signal (2nd signal)
+  
   // System type
   systemType: 'SKA' | 'SKE';  // СКА or СКЭ
   

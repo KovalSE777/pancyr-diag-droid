@@ -356,6 +356,10 @@ export class CapacitorBluetoothService {
       fuseEvaporator: false,
       fuseCompressor: true,
       
+      // Soft start signals (УПП)
+      signal_SVD: true,
+      signal_ContactNorm: true,
+      
       systemType: systemType.toUpperCase() as 'SKA' | 'SKE',
       mode: 'cooling',
       sSTATUS: 0x42,
