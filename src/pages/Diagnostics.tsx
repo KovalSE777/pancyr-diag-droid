@@ -147,35 +147,36 @@ const Diagnostics = () => {
     <div className="min-h-screen bg-background pb-20">
       {/* Header */}
       <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4">
+        <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-4">
           <div className="flex items-center justify-between mb-2">
             <Button 
               variant="ghost" 
               onClick={() => navigate(-1)}
-              className="text-foreground hover:text-primary"
+              className="text-foreground hover:text-primary text-sm sm:text-base px-2 sm:px-4"
             >
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Назад
+              <ArrowLeft className="mr-1 sm:mr-2 h-4 w-4" />
+              <span className="hidden sm:inline">Назад</span>
             </Button>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 sm:gap-2">
               {isLive && (
-                <Badge variant="outline" className="border-success text-success">
-                  <Activity className="w-3 h-3 mr-1 animate-pulse" />
-                  В реальном времени
+                <Badge variant="outline" className="border-success text-success text-[10px] sm:text-xs px-1.5 sm:px-2">
+                  <Activity className="w-2 h-2 sm:w-3 sm:h-3 mr-0.5 sm:mr-1 animate-pulse" />
+                  <span className="hidden sm:inline">В реальном времени</span>
+                  <span className="sm:hidden">Live</span>
                 </Badge>
               )}
-              <Badge className={getModeColor()}>
+              <Badge className={`${getModeColor()} text-[10px] sm:text-xs px-1.5 sm:px-2`}>
                 {getModeText()}
               </Badge>
             </div>
           </div>
-          <h1 className="text-2xl font-bold text-foreground text-center">
+          <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-foreground text-center">
             {systemType.toUpperCase()} - Диагностика
           </h1>
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-6 space-y-6">
+      <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4 sm:space-y-6">
         {/* Test Mode Control */}
         <TestModeControl 
           systemType={systemType.toUpperCase() as 'SKA' | 'SKE'}
@@ -184,76 +185,76 @@ const Diagnostics = () => {
         />
 
         {/* System Overview */}
-        <Card className="p-6 bg-card border-border animate-fade-in">
-          <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-foreground">
-            <Thermometer className="w-6 h-6 text-primary" />
-            Общие параметры
+        <Card className="p-4 sm:p-6 bg-card border-border animate-fade-in">
+          <h2 className="text-lg sm:text-xl font-bold mb-3 sm:mb-4 flex items-center gap-2 text-foreground">
+            <Thermometer className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
+            <span className="text-base sm:text-xl">Общие параметры</span>
           </h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="p-4 rounded-lg bg-background/50 text-center">
-              <p className="text-xs text-muted-foreground mb-1">Температура воздуха</p>
-              <p className="text-2xl font-mono font-bold text-foreground">{data.T_air.toFixed(1)}°C</p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3 md:gap-4">
+            <div className="p-3 sm:p-4 rounded-lg bg-background/50 text-center">
+              <p className="text-[10px] sm:text-xs text-muted-foreground mb-1">Температура воздуха</p>
+              <p className="text-lg sm:text-2xl font-mono font-bold text-foreground">{data.T_air.toFixed(1)}°C</p>
             </div>
-            <div className="p-4 rounded-lg bg-background/50 text-center">
-              <p className="text-xs text-muted-foreground mb-1">Температура испарителя</p>
-              <p className="text-2xl font-mono font-bold text-foreground">{data.T_isp.toFixed(1)}°C</p>
+            <div className="p-3 sm:p-4 rounded-lg bg-background/50 text-center">
+              <p className="text-[10px] sm:text-xs text-muted-foreground mb-1">Температура испарителя</p>
+              <p className="text-lg sm:text-2xl font-mono font-bold text-foreground">{data.T_isp.toFixed(1)}°C</p>
             </div>
-            <div className="p-4 rounded-lg bg-background/50 text-center">
-              <p className="text-xs text-muted-foreground mb-1">Напряжение питания</p>
-              <p className="text-2xl font-mono font-bold text-foreground">{data.U_nap.toFixed(1)}V</p>
+            <div className="p-3 sm:p-4 rounded-lg bg-background/50 text-center">
+              <p className="text-[10px] sm:text-xs text-muted-foreground mb-1">Напряжение питания</p>
+              <p className="text-lg sm:text-2xl font-mono font-bold text-foreground">{data.U_nap.toFixed(1)}V</p>
             </div>
-            <div className="p-4 rounded-lg bg-background/50 text-center">
-              <p className="text-xs text-muted-foreground mb-1">Давление</p>
-              <p className="text-2xl font-mono font-bold text-foreground">{((data.U_davl / 255) * 100).toFixed(0)}%</p>
+            <div className="p-3 sm:p-4 rounded-lg bg-background/50 text-center">
+              <p className="text-[10px] sm:text-xs text-muted-foreground mb-1">Давление</p>
+              <p className="text-lg sm:text-2xl font-mono font-bold text-foreground">{((data.U_davl / 255) * 100).toFixed(0)}%</p>
             </div>
           </div>
         </Card>
 
         {/* Fans Visual Status */}
-        <Card className="p-6 bg-card border-border animate-fade-in [animation-delay:50ms]">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-bold flex items-center gap-2 text-foreground">
-              <Wind className="w-6 h-6 text-primary" />
-              Вентиляторы
+        <Card className="p-4 sm:p-6 bg-card border-border animate-fade-in [animation-delay:50ms]">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 sm:mb-6 gap-3">
+            <h2 className="text-lg sm:text-xl font-bold flex items-center gap-2 text-foreground">
+              <Wind className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
+              <span className="text-base sm:text-xl">Вентиляторы</span>
             </h2>
-            <div className="flex items-center gap-4 text-sm">
+            <div className="flex items-center gap-3 sm:gap-4 text-xs sm:text-sm flex-wrap">
               <div className="flex items-center gap-2">
                 <span className="text-muted-foreground">Скорость:</span>
-                <Badge variant={data.PWM_spd === 2 ? "default" : "secondary"}>
+                <Badge variant={data.PWM_spd === 2 ? "default" : "secondary"} className="text-xs">
                   {data.PWM_spd === 2 ? 'Быстро' : 'Медленно'}
                 </Badge>
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-muted-foreground">Активных:</span>
-                <Badge variant="outline">{data.n_V_cnd + data.n_V_isp + data.n_V_cmp}</Badge>
+                <Badge variant="outline" className="text-xs">{data.n_V_cnd + data.n_V_isp + data.n_V_cmp}</Badge>
               </div>
             </div>
           </div>
-          <div className="flex flex-col lg:flex-row gap-8">
-            <div className="flex-1">
+          <div className="space-y-6">
+            <div>
               <FanIndicator 
                 fans={data.condenserFans} 
                 label="Конденсатор" 
               />
-              <p className="text-center text-sm text-muted-foreground mt-2">
+              <p className="text-center text-xs sm:text-sm text-muted-foreground mt-2">
                 Активно: {data.n_V_cnd} из {data.kUM1_cnd}
               </p>
             </div>
-            <div className="flex-1">
+            <div>
               <FanIndicator 
                 fans={data.evaporatorFans} 
                 label="Испаритель" 
               />
-              <p className="text-center text-sm text-muted-foreground mt-2">
+              <p className="text-center text-xs sm:text-sm text-muted-foreground mt-2">
                 Активно: {data.n_V_isp} из {data.kUM2_isp}
               </p>
             </div>
-            <div className="flex-1">
+            <div>
               <FanIndicator 
                 fans={data.compressorFans} 
                 label="Компрессор" 
               />
-              <p className="text-center text-sm text-muted-foreground mt-2">
+              <p className="text-center text-xs sm:text-sm text-muted-foreground mt-2">
                 Активно: {data.n_V_cmp} из {data.kUM3_cmp}
               </p>
             </div>
@@ -261,23 +262,23 @@ const Diagnostics = () => {
         </Card>
 
         {/* Voltage Drops */}
-        <Card className="p-6 bg-card border-border animate-fade-in [animation-delay:100ms]">
-          <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-foreground">
-            <Zap className="w-5 h-5 text-warning" />
-            Просадки напряжения
+        <Card className="p-4 sm:p-6 bg-card border-border animate-fade-in [animation-delay:100ms]">
+          <h2 className="text-lg sm:text-xl font-bold mb-3 sm:mb-4 flex items-center gap-2 text-foreground">
+            <Zap className="w-4 h-4 sm:w-5 sm:h-5 text-warning" />
+            <span className="text-base sm:text-xl">Просадки напряжения</span>
           </h2>
-          <div className="grid grid-cols-3 gap-4">
-            <div className="text-center p-4 rounded-lg bg-background/50">
-              <p className="text-sm text-muted-foreground mb-2">dUM1 (Конд.)</p>
-              <p className="text-3xl font-mono font-bold text-primary">{data.dUP_M1.toFixed(1)}V</p>
+          <div className="grid grid-cols-3 gap-2 sm:gap-3 md:gap-4">
+            <div className="text-center p-2 sm:p-3 md:p-4 rounded-lg bg-background/50">
+              <p className="text-[10px] sm:text-xs md:text-sm text-muted-foreground mb-1 sm:mb-2">dUM1 (Конд.)</p>
+              <p className="text-xl sm:text-2xl md:text-3xl font-mono font-bold text-primary">{data.dUP_M1.toFixed(1)}V</p>
             </div>
-            <div className="text-center p-4 rounded-lg bg-background/50">
-              <p className="text-sm text-muted-foreground mb-2">dUM2 (Исп.)</p>
-              <p className="text-3xl font-mono font-bold text-primary">{data.dUP_M2.toFixed(1)}V</p>
+            <div className="text-center p-2 sm:p-3 md:p-4 rounded-lg bg-background/50">
+              <p className="text-[10px] sm:text-xs md:text-sm text-muted-foreground mb-1 sm:mb-2">dUM2 (Исп.)</p>
+              <p className="text-xl sm:text-2xl md:text-3xl font-mono font-bold text-primary">{data.dUP_M2.toFixed(1)}V</p>
             </div>
-            <div className="text-center p-4 rounded-lg bg-background/50">
-              <p className="text-sm text-muted-foreground mb-2">dUM3 (Комп.)</p>
-              <p className="text-3xl font-mono font-bold text-primary">{data.dUP_M3.toFixed(1)}V</p>
+            <div className="text-center p-2 sm:p-3 md:p-4 rounded-lg bg-background/50">
+              <p className="text-[10px] sm:text-xs md:text-sm text-muted-foreground mb-1 sm:mb-2">dUM3 (Комп.)</p>
+              <p className="text-xl sm:text-2xl md:text-3xl font-mono font-bold text-primary">{data.dUP_M3.toFixed(1)}V</p>
             </div>
           </div>
         </Card>

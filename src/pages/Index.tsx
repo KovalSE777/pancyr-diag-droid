@@ -17,16 +17,16 @@ const Index = () => {
       <div className="absolute inset-0 bg-gradient-to-b from-background via-background/95 to-background" />
       
       {/* Content */}
-      <div className="relative z-10 container mx-auto px-4 py-12 min-h-screen flex flex-col">
+      <div className="relative z-10 container mx-auto px-4 py-8 sm:py-12 min-h-screen flex flex-col">
         {/* Header */}
-        <header className="text-center mb-16 animate-fade-in">
-          <h1 className="text-5xl md:text-7xl font-bold mb-4 bg-gradient-to-r from-primary via-accent to-secondary bg-clip-text text-transparent">
+        <header className="text-center mb-12 sm:mb-16 animate-fade-in">
+          <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold mb-4 bg-gradient-to-r from-primary via-accent to-secondary bg-clip-text text-transparent">
             Панцирь
           </h1>
-          <p className="text-xl md:text-2xl text-muted-foreground mb-2">
+          <p className="text-lg sm:text-xl md:text-2xl text-muted-foreground mb-2 px-4">
             Система диагностики кондиционирования
           </p>
-          <div className="w-32 h-1 mx-auto bg-gradient-to-r from-primary via-accent to-secondary rounded-full" />
+          <div className="w-24 sm:w-32 h-1 mx-auto bg-gradient-to-r from-primary via-accent to-secondary rounded-full" />
         </header>
 
         {/* Main Cards */}

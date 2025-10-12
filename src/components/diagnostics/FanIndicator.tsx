@@ -25,32 +25,34 @@ export const FanIndicator = ({ fans, label }: FanIndicatorProps) => {
   };
 
   return (
-    <div className="space-y-4">
-      <h3 className="text-2xl font-bold text-foreground text-center">{label}</h3>
-      <div className="w-full flex gap-6 overflow-x-auto pb-2 justify-center">
+    <div className="space-y-3">
+      <h3 className="text-lg sm:text-xl md:text-2xl font-bold text-foreground text-center">{label}</h3>
+      <div className="w-full flex gap-3 sm:gap-4 md:gap-6 overflow-x-auto pb-2 justify-start sm:justify-center snap-x snap-mandatory">
         {fans.map((fan) => (
-          <div key={fan.id} className="flex flex-col items-center space-y-3 min-w-fit">
+          <div key={fan.id} className="flex flex-col items-center space-y-2 min-w-fit snap-center">
             <div 
               className={cn(
-                "w-40 h-40 rounded-xl border-2 flex items-center justify-center transition-all",
+                "w-20 h-20 sm:w-28 sm:h-28 md:w-32 md:h-32 lg:w-40 lg:h-40 rounded-lg sm:rounded-xl border-2 flex items-center justify-center transition-all",
                 getStatusBgColor(fan.status)
               )}
             >
               <Fan 
                 className={cn(
-                  "w-20 h-20 transition-all",
+                  "w-10 h-10 sm:w-14 sm:h-14 md:w-16 md:h-16 lg:w-20 lg:h-20 transition-all",
                   getStatusColor(fan.status),
                   fan.status === 'ok' && "animate-spin"
                 )} 
                 style={fan.status === 'ok' ? { animationDuration: '2s' } : {}}
               />
             </div>
-            <p className="text-base font-medium text-foreground">Вентилятор #{fan.id}</p>
+            <p className="text-xs sm:text-sm md:text-base font-medium text-foreground whitespace-nowrap">
+              Вент. #{fan.id}
+            </p>
             
             {fan.status === 'error' && (
-              <div className="mt-2 p-3 bg-destructive/10 border border-destructive/30 rounded-lg w-64">
-                <p className="text-sm font-semibold text-destructive mb-1">{fan.errorMessage}</p>
-                <p className="text-xs text-muted-foreground">💡 {fan.repairHint}</p>
+              <div className="mt-2 p-2 sm:p-3 bg-destructive/10 border border-destructive/30 rounded-lg w-full max-w-[240px] sm:max-w-xs">
+                <p className="text-xs sm:text-sm font-semibold text-destructive mb-1 leading-tight">{fan.errorMessage}</p>
+                <p className="text-[10px] sm:text-xs text-muted-foreground leading-tight">💡 {fan.repairHint}</p>
               </div>
             )}
           </div>
