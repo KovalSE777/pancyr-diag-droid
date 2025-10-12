@@ -2,7 +2,7 @@ import { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'app.lovable.ba41ab0de47a46879e70cd17cee4dfd3',
-  appName: 'БСКУ Диагностика',
+  appName: 'Diagnostics Pantcir',
   webDir: 'dist',
   bundledWebRuntime: false,
   
