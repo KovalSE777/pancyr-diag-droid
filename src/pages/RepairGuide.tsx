@@ -2,7 +2,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, Search, Wrench, AlertTriangle, CheckCircle2, Fan, Zap } from "lucide-react";
+import { ArrowLeft, Search, Wrench, AlertTriangle, CheckCircle2, Fan, Zap, Thermometer } from "lucide-react";
 import { useState } from "react";
 
 interface RepairItem {
@@ -232,11 +232,58 @@ const RepairGuide = () => {
     item.symptoms.some(s => s.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
+  // Группировка по категориям
+  const groupedRepairs = filteredRepairs.reduce((acc, item) => {
+    if (!acc[item.category]) {
+      acc[item.category] = [];
+    }
+    acc[item.category].push(item);
+    return acc;
+  }, {} as Record<string, RepairItem[]>);
+
+  const categoryOrder: Array<RepairItem['category']> = ['fuse', 'fan', 'compressor', 'sensor'];
+  
+  const getCategoryInfo = (category: string) => {
+    switch (category) {
+      case 'fuse': 
+        return { 
+          icon: <Zap className="w-6 h-6" />, 
+          title: 'Предохранители',
+          color: 'text-warning'
+        };
+      case 'fan': 
+        return { 
+          icon: <Fan className="w-6 h-6" />, 
+          title: 'Вентиляторы',
+          color: 'text-primary'
+        };
+      case 'compressor': 
+        return { 
+          icon: <Wrench className="w-6 h-6" />, 
+          title: 'Компрессор',
+          color: 'text-accent'
+        };
+      case 'sensor': 
+        return { 
+          icon: <Thermometer className="w-6 h-6" />, 
+          title: 'Датчики',
+          color: 'text-success'
+        };
+      default: 
+        return { 
+          icon: <AlertTriangle className="w-6 h-6" />, 
+          title: 'Общее',
+          color: 'text-muted-foreground'
+        };
+    }
+  };
+
   const getCategoryIcon = (category: string) => {
     switch (category) {
       case 'fuse': return <Zap className="w-5 h-5" />;
       case 'fan': return <Fan className="w-5 h-5" />;
       case 'compressor': return <Wrench className="w-5 h-5" />;
+      case 'sensor': return <Thermometer className="w-5 h-5" />;
       default: return <AlertTriangle className="w-5 h-5" />;
     }
   };
@@ -279,80 +326,102 @@ const RepairGuide = () => {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-6 space-y-4">
+      <main className="container mx-auto px-4 py-6 space-y-8">
         {filteredRepairs.length === 0 ? (
           <Card className="p-12 text-center bg-card border-border">
             <p className="text-muted-foreground">Ничего не найдено. Попробуйте другой запрос.</p>
           </Card>
         ) : (
-          filteredRepairs.map((item, index) => (
-            <Card 
-              key={item.id} 
-              className="p-6 bg-card border-border hover:border-primary transition-all duration-300 animate-fade-in cursor-pointer"
-              style={{ animationDelay: `${index * 50}ms` }}
-            >
-              <div className="flex items-start gap-4">
-                <div className={`flex-shrink-0 w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center ${getSeverityColor(item.severity)}`}>
-                  {getCategoryIcon(item.category)}
+          categoryOrder.map((category) => {
+            const items = groupedRepairs[category];
+            if (!items || items.length === 0) return null;
+            
+            const categoryInfo = getCategoryInfo(category);
+            
+            return (
+              <div key={category} className="space-y-4">
+                {/* Заголовок категории */}
+                <div className="flex items-center gap-3 pb-3 border-b-2 border-border">
+                  <div className={`flex-shrink-0 w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center ${categoryInfo.color}`}>
+                    {categoryInfo.icon}
+                  </div>
+                  <h2 className="text-2xl font-bold text-foreground">{categoryInfo.title}</h2>
                 </div>
-                <div className="flex-1 space-y-4">
-                  <div>
-                    <h3 className="text-xl font-bold text-foreground mb-2">{item.title}</h3>
-                    <div className="flex gap-2 mb-3">
-                      <span className={`text-xs px-2 py-1 rounded-full ${
-                        item.severity === 'warning' ? 'bg-warning/20 text-warning' :
-                        'bg-accent/20 text-accent'
-                      }`}>
-                        {item.severity === 'warning' ? 'Внимание' : 'Инфо'}
-                      </span>
-                    </div>
-                  </div>
 
-                  <div>
-                    <p className="text-sm font-semibold text-foreground mb-2">Симптомы:</p>
-                    <ul className="text-sm text-muted-foreground space-y-1">
-                      {item.symptoms.map((symptom, i) => (
-                        <li key={i}>• {symptom}</li>
-                      ))}
-                    </ul>
-                  </div>
+                {/* Кейсы в категории */}
+                <div className="space-y-4">
+                  {items.map((item, index) => (
+                    <Card 
+                      key={item.id} 
+                      className="p-6 bg-card border-border hover:border-primary transition-all duration-300 animate-fade-in"
+                      style={{ animationDelay: `${index * 50}ms` }}
+                    >
+                      <div className="flex items-start gap-4">
+                        <div className={`flex-shrink-0 w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center ${getSeverityColor(item.severity)}`}>
+                          {getCategoryIcon(item.category)}
+                        </div>
+                        <div className="flex-1 space-y-4">
+                          <div>
+                            <h3 className="text-xl font-bold text-foreground mb-2">{item.title}</h3>
+                            <div className="flex gap-2 mb-3">
+                              <span className={`text-xs px-2 py-1 rounded-full ${
+                                item.severity === 'warning' ? 'bg-warning/20 text-warning' :
+                                'bg-accent/20 text-accent'
+                              }`}>
+                                {item.severity === 'warning' ? 'Внимание' : 'Инфо'}
+                              </span>
+                            </div>
+                          </div>
 
-                  <div>
-                    <p className="text-sm font-semibold text-foreground mb-2">Диагностика:</p>
-                    <p className="text-sm text-muted-foreground">{item.diagnosis}</p>
-                  </div>
+                          <div>
+                            <p className="text-sm font-semibold text-foreground mb-2">Симптомы:</p>
+                            <ul className="text-sm text-muted-foreground space-y-1">
+                              {item.symptoms.map((symptom, i) => (
+                                <li key={i}>• {symptom}</li>
+                              ))}
+                            </ul>
+                          </div>
 
-                  <div>
-                    <p className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
-                      <CheckCircle2 className="w-4 h-4 text-success" />
-                      Решение:
-                    </p>
-                    <ol className="text-sm text-muted-foreground space-y-2">
-                      {item.solution.map((step, i) => (
-                        <li key={i} className="flex gap-2">
-                          <span className="flex-shrink-0 w-5 h-5 rounded-full bg-primary/20 text-primary flex items-center justify-center text-xs font-bold">
-                            {i + 1}
-                          </span>
-                          <span>{step}</span>
-                        </li>
-                      ))}
-                    </ol>
-                  </div>
+                          <div>
+                            <p className="text-sm font-semibold text-foreground mb-2">Диагностика:</p>
+                            <p className="text-sm text-muted-foreground">{item.diagnosis}</p>
+                          </div>
 
-                  <div>
-                    <p className="text-sm font-semibold text-foreground mb-2">Необходимые инструменты:</p>
-                    <div className="flex flex-wrap gap-2">
-                      {item.tools.map((tool, i) => (
-                        <span key={i} className="text-xs px-3 py-1 rounded-full bg-accent/20 text-accent">
-                          {tool}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
+                          <div>
+                            <p className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
+                              <CheckCircle2 className="w-4 h-4 text-success" />
+                              Решение:
+                            </p>
+                            <ol className="text-sm text-muted-foreground space-y-2">
+                              {item.solution.map((step, i) => (
+                                <li key={i} className="flex gap-2">
+                                  <span className="flex-shrink-0 w-5 h-5 rounded-full bg-primary/20 text-primary flex items-center justify-center text-xs font-bold">
+                                    {i + 1}
+                                  </span>
+                                  <span>{step}</span>
+                                </li>
+                              ))}
+                            </ol>
+                          </div>
+
+                          <div>
+                            <p className="text-sm font-semibold text-foreground mb-2">Необходимые инструменты:</p>
+                            <div className="flex flex-wrap gap-2">
+                              {item.tools.map((tool, i) => (
+                                <span key={i} className="text-xs px-3 py-1 rounded-full bg-accent/20 text-accent">
+                                  {tool}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
                 </div>
               </div>
-            </Card>
-          ))
+            );
+          })
         )}
       </main>
     </div>
