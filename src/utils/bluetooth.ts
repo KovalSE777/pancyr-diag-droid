@@ -32,8 +32,7 @@ export class PantsirBluetoothService {
       // Request Bluetooth device
       this.device = await (navigator as any).bluetooth.requestDevice({
         filters: [
-          { namePrefix: 'Pantsir' },
-          { namePrefix: 'BSKU' }
+          { services: [this.UART_SERVICE_UUID] }
         ],
         optionalServices: [this.UART_SERVICE_UUID]
       });
