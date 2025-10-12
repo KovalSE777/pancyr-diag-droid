@@ -27,18 +27,18 @@ export const FanIndicator = ({ fans, label }: FanIndicatorProps) => {
   return (
     <div className="space-y-3">
       <h3 className="text-lg sm:text-xl md:text-2xl font-bold text-foreground text-center">{label}</h3>
-      <div className="w-full flex gap-3 sm:gap-4 md:gap-6 overflow-x-auto pb-2 justify-start sm:justify-center snap-x snap-mandatory">
+      <div className="w-full flex gap-2 sm:gap-3 md:gap-4 overflow-x-auto pb-2 justify-start sm:justify-center">
         {fans.map((fan) => (
-          <div key={fan.id} className="flex flex-col items-center space-y-2 min-w-fit snap-center">
+          <div key={fan.id} className="flex flex-col items-center space-y-2 min-w-fit">
             <div 
               className={cn(
-                "w-20 h-20 sm:w-28 sm:h-28 md:w-32 md:h-32 lg:w-40 lg:h-40 rounded-lg sm:rounded-xl border-2 flex items-center justify-center transition-all",
+                "w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 lg:w-28 lg:h-28 rounded-lg border-2 flex items-center justify-center transition-all",
                 getStatusBgColor(fan.status)
               )}
             >
               <Fan 
                 className={cn(
-                  "w-10 h-10 sm:w-14 sm:h-14 md:w-16 md:h-16 lg:w-20 lg:h-20 transition-all",
+                  "w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 lg:w-14 lg:h-14 transition-all",
                   getStatusColor(fan.status),
                   fan.status === 'ok' && "animate-spin"
                 )} 
