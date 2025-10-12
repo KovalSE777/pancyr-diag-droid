@@ -151,7 +151,7 @@ const Diagnostics = () => {
           <div className="flex items-center justify-between mb-2">
             <Button 
               variant="ghost" 
-              onClick={() => navigate(-1)}
+              onClick={() => navigate(`/system-select?type=${systemType}`)}
               className="text-foreground hover:text-primary text-sm sm:text-base px-2 sm:px-4"
             >
               <ArrowLeft className="mr-1 sm:mr-2 h-4 w-4" />
