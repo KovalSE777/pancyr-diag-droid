@@ -2,8 +2,9 @@ import { BluetoothSerial } from '@e-is/capacitor-bluetooth-serial';
 import { DiagnosticData } from '@/types/bluetooth';
 import { ProtocolParser, Frame0x88, Frame0x66, Frame0x77 } from './protocol-parser';
 import { Screen4Parser } from './screen4-parser';
-import { appendChecksum, toHex } from './checksum';
+import { toHex, buildUDS, ackUOKS, ackUOKP } from './checksum';
 import { logService } from './log-service';
+import { HexFrame } from '@/components/diagnostics/LiveHexMonitor';
 
 export class CapacitorBluetoothService {
   private deviceAddress: string | null = null;
@@ -13,6 +14,8 @@ export class CapacitorBluetoothService {
   private testerPresentInterval: number | null = null;
   private connectionEstablished: boolean = false;
   private readInterval: number | null = null;
+  private hexFrames: HexFrame[] = [];
+  private onFramesUpdate?: (frames: HexFrame[]) => void;
   
   private readonly BSKU_ADDRESS = 0x28;
   private readonly TESTER_ADDRESS = 0xF0;
@@ -91,7 +94,9 @@ export class CapacitorBluetoothService {
         const result = await BluetoothSerial.read({ address: this.deviceAddress });
         if (result.value) {
           const bytes = this.hexToBytes(result.value);
-          logService.info('BT-RX', `${bytes.length}b: ${toHex(bytes)}`);
+          const hex = toHex(bytes);
+          this.addHexFrame('RX', hex);
+          logService.info('BT-RX', `${bytes.length}b: ${hex}`);
           this.parser.addData(bytes);
           
           let frame;
@@ -115,6 +120,7 @@ export class CapacitorBluetoothService {
         this.deviceAddress = null;
         this.connectionEstablished = false;
         this.parser.clearBuffer();
+        this.hexFrames = [];
       } catch (error) {
         console.error('Disconnect failed:', error);
       }
@@ -151,11 +157,15 @@ export class CapacitorBluetoothService {
     }
     else if (frame.type === 0x66) {
       const f = frame as Frame0x66;
-      this.sendASCII(`UOKS${String.fromCharCode(f.screen)}`).catch(() => {});
+      const ack = ackUOKS(f.screen);
+      this.sendRaw(ack).catch(() => {});
+      logService.info('BT-TX', `UOKS${f.screen}`);
     }
     else if (frame.type === 0x77) {
       const f = frame as Frame0x77;
-      this.sendASCII(`UOKP${String.fromCharCode(f.packageNum)}`).catch(() => {});
+      const ack = ackUOKP(f.packageNum);
+      this.sendRaw(ack).catch(() => {});
+      logService.info('BT-TX', `UOKP${f.packageNum}`);
     }
     else if (frame.type === 'UDS') {
       if (frame.dst === this.EXPECTED_DST && frame.src === this.EXPECTED_SRC) {
@@ -164,20 +174,43 @@ export class CapacitorBluetoothService {
     }
   }
 
-  private async sendASCII(text: string): Promise<void> {
+  private async sendRaw(bytes: Uint8Array): Promise<void> {
     if (!this.deviceAddress) throw new Error('Not connected');
-    const bytes = new TextEncoder().encode(text);
-    await BluetoothSerial.write({ address: this.deviceAddress, value: this.bytesToHex(bytes) });
+    const hex = this.bytesToHex(bytes);
+    this.addHexFrame('TX', hex);
+    await BluetoothSerial.write({ address: this.deviceAddress, value: hex });
   }
 
   private async sendUDSCommand(serviceData: number[]): Promise<void> {
     if (!this.deviceAddress) throw new Error('Not connected');
-    const N = serviceData.length + 2;
-    const hdr = 0x80 | ((N - 2) & 0x3F);
-    const packet = [hdr, this.BSKU_ADDRESS, this.TESTER_ADDRESS, ...serviceData];
-    const fullPacket = appendChecksum(packet);
+    const sid = serviceData[0];
+    const data = serviceData.slice(1);
+    const fullPacket = buildUDS(this.BSKU_ADDRESS, this.TESTER_ADDRESS, sid, data);
     logService.info('BT-TX', `UDS: ${toHex(fullPacket)}`);
-    await BluetoothSerial.write({ address: this.deviceAddress, value: this.bytesToHex(fullPacket) });
+    await this.sendRaw(fullPacket);
+  }
+
+  private addHexFrame(direction: 'TX' | 'RX', hex: string, checksumOk?: boolean, description?: string): void {
+    this.hexFrames.push({
+      direction,
+      timestamp: Date.now(),
+      hex,
+      checksumOk,
+      description
+    });
+    // Храним только последние 50 кадров
+    if (this.hexFrames.length > 50) {
+      this.hexFrames = this.hexFrames.slice(-50);
+    }
+    this.onFramesUpdate?.(this.hexFrames);
+  }
+
+  setOnFramesUpdate(callback: (frames: HexFrame[]) => void): void {
+    this.onFramesUpdate = callback;
+  }
+
+  getHexFrames(): HexFrame[] {
+    return this.hexFrames;
   }
 
   private async sendStartCommunication(): Promise<void> {

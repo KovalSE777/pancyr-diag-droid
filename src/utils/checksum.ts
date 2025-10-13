@@ -42,3 +42,33 @@ export function toHex(bytes: ArrayLike<number>): string {
     .map(b => b.toString(16).padStart(2, '0').toUpperCase())
     .join(' ');
 }
+
+/**
+ * Создаёт UDS-подобный кадр
+ * @param dst - адрес назначения (0x28 для блока)
+ * @param src - адрес источника (0xF0 для тестера)
+ * @param sid - Service ID
+ * @param data - данные команды
+ */
+export function buildUDS(dst: number = 0x28, src: number = 0xF0, sid: number, data: number[] = []): Uint8Array {
+  const body = [dst, src, sid, ...data];
+  const B = body.length + 1; // +CHK
+  const hdr = 0x80 | ((B - 2) & 0x3F);
+  const noChk = [hdr, ...body];
+  const sum = calculateChecksum(noChk);
+  return new Uint8Array([...noChk, sum]);
+}
+
+/**
+ * Создаёт ACK для кадра 0x66 (UOKS)
+ */
+export function ackUOKS(screenNum: number): Uint8Array {
+  return new TextEncoder().encode(`UOKS${String.fromCharCode(screenNum)}`);
+}
+
+/**
+ * Создаёт ACK для кадра 0x77 (UOKP)
+ */
+export function ackUOKP(packageNum: number): Uint8Array {
+  return new TextEncoder().encode(`UOKP${String.fromCharCode(packageNum)}`);
+}

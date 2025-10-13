@@ -13,6 +13,7 @@ import { ComponentIndicator } from "@/components/diagnostics/ComponentIndicator"
 import { FuseIndicator } from "@/components/diagnostics/FuseIndicator";
 import { SoftStartSignals } from "@/components/diagnostics/SoftStartSignals";
 import { TestModeControl } from "@/components/diagnostics/TestModeControl";
+import { LiveHexMonitor, HexFrame } from "@/components/diagnostics/LiveHexMonitor";
 import { Capacitor } from "@capacitor/core";
 import { useToast } from "@/hooks/use-toast";
 
@@ -23,6 +24,7 @@ const Diagnostics = () => {
   const [data, setData] = useState<DiagnosticData | null>(null);
   const [isLive, setIsLive] = useState(false);
   const [showDebug, setShowDebug] = useState(false);
+  const [hexFrames, setHexFrames] = useState<HexFrame[]>([]);
   const [connectionInfo, setConnectionInfo] = useState({
     connected: false,
     lastRequest: '',
@@ -94,6 +96,15 @@ const Diagnostics = () => {
   useEffect(() => {
     const isNative = Capacitor.isNativePlatform();
     const service = isNative ? capacitorBluetoothService : bluetoothService;
+    
+    // Setup hex frame listener for native
+    if (isNative && !useMock) {
+      capacitorBluetoothService.setOnFramesUpdate((frames) => {
+        setHexFrames(frames);
+      });
+      // Load initial frames
+      setHexFrames(capacitorBluetoothService.getHexFrames());
+    }
     
     // Load diagnostic data
     if (useMock || !service.isConnected()) {
@@ -253,6 +264,11 @@ const Diagnostics = () => {
       </header>
 
       <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4 sm:space-y-6">
+        {/* Live HEX Monitor */}
+        {!useMock && Capacitor.isNativePlatform() && (
+          <LiveHexMonitor frames={hexFrames} />
+        )}
+
         {/* BLE Connection Debug Info */}
         {!useMock && showDebug && (
           <Card className="p-4 bg-slate-900 border-primary">
