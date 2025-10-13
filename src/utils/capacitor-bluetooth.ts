@@ -34,18 +34,24 @@ export class CapacitorBluetoothService {
       
       console.log('🔵 [BLE Native] Requesting device with UART service UUID:', this.UART_SERVICE_UUID);
       
-      // Request device with filter
-      // Запрос устройства - покажет ВСЕ доступные Bluetooth устройства
+      // Request only BLE devices that advertise the Nordic UART Service (prevents classic HC-05 from appearing)
       const device = await BleClient.requestDevice({
-        optionalServices: [this.UART_SERVICE_UUID]
+        services: [this.UART_SERVICE_UUID],
       });
       
       if (!device.deviceId) {
         throw new Error('No device selected');
       }
       
-      logService.success('BLE Native', `Device selected: ${device.name || device.deviceId}`);
-      console.log('🔵 [BLE Native] Device selected:', device.name || device.deviceId);
+      const selectedName = device.name || device.deviceId;
+      logService.success('BLE Native', `Device selected: ${selectedName}`);
+      console.log('🔵 [BLE Native] Device selected:', selectedName);
+      
+      // Extra guard: classic HC-05 modules are not BLE and do not expose GATT characteristics.
+      // If the user somehow sees/selects it, abort with a helpful error.
+      if (selectedName && /HC[-_ ]?05/i.test(selectedName)) {
+        throw new Error('Обнаружен модуль HC-05 (классический Bluetooth). Нужен BLE-модуль с сервисом Nordic UART (например, ESP32/HM-10).');
+      }
       
       this.deviceId = device.deviceId;
       
