@@ -157,19 +157,29 @@ export class CapacitorBluetoothService {
     }
     else if (frame.type === 0x66) {
       const f = frame as Frame0x66;
+      // Отправляем ACK: UOKS<n>
       const ack = ackUOKS(f.screen);
       this.sendRaw(ack).catch(() => {});
-      logService.info('BT-TX', `UOKS${f.screen}`);
+      const ackHex = this.bytesToHex(ack);
+      this.addHexFrame('TX', ackHex, true, `ACK UOKS${f.screen}`);
+      logService.info('BT-TX', `UOKS${f.screen} (${ackHex})`);
     }
     else if (frame.type === 0x77) {
       const f = frame as Frame0x77;
+      // Отправляем ACK: UOKP<n>
       const ack = ackUOKP(f.packageNum);
       this.sendRaw(ack).catch(() => {});
-      logService.info('BT-TX', `UOKP${f.packageNum}`);
+      const ackHex = this.bytesToHex(ack);
+      this.addHexFrame('TX', ackHex, true, `ACK UOKP${f.packageNum}`);
+      logService.info('BT-TX', `UOKP${f.packageNum} (${ackHex})`);
     }
     else if (frame.type === 'UDS') {
+      // Принимаем все UDS, не фильтруем!
       if (frame.dst === this.EXPECTED_DST && frame.src === this.EXPECTED_SRC) {
-        logService.success('BT-RX', `UDS: SID=0x${frame.sid.toString(16).toUpperCase()}`);
+        logService.success('BT-RX', `✓ UDS Response: SID=0x${frame.sid.toString(16).toUpperCase()}`);
+        // Здесь можно парсить данные из frame.data
+      } else {
+        logService.info('BT-RX', `UDS: DST=0x${frame.dst.toString(16)} SRC=0x${frame.src.toString(16)} SID=0x${frame.sid.toString(16)}`);
       }
     }
   }
@@ -191,17 +201,21 @@ export class CapacitorBluetoothService {
   }
 
   private addHexFrame(direction: 'TX' | 'RX', hex: string, checksumOk?: boolean, description?: string): void {
-    this.hexFrames.push({
+    const frame: HexFrame = {
       direction,
       timestamp: Date.now(),
-      hex,
+      hex: hex.toUpperCase().replace(/(.{2})/g, '$1 ').trim(), // Форматируем с пробелами
       checksumOk,
       description
-    });
+    };
+    
+    this.hexFrames.push(frame);
+    
     // Храним только последние 50 кадров
     if (this.hexFrames.length > 50) {
       this.hexFrames = this.hexFrames.slice(-50);
     }
+    
     this.onFramesUpdate?.(this.hexFrames);
   }
 

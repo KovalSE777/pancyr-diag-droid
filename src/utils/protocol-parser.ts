@@ -51,33 +51,36 @@ export class ProtocolParser {
    * Возвращает null если недостаточно данных
    */
   parseNextFrame(): ParsedFrame {
-    if (this.buffer.length === 0) return null;
+    // Цикл для пропуска неизвестных байтов по одному
+    while (this.buffer.length > 0) {
+      const firstByte = this.buffer[0];
 
-    const firstByte = this.buffer[0];
+      // Кадр 0x88 - Телеметрия экрана
+      if (firstByte === 0x88) {
+        return this.parse0x88();
+      }
 
-    // Кадр 0x88 - Телеметрия экрана
-    if (firstByte === 0x88) {
-      return this.parse0x88();
+      // Кадр 0x66 - Запрос экрана
+      if (firstByte === 0x66) {
+        return this.parse0x66();
+      }
+
+      // Кадр 0x77 - Конфигурация
+      if (firstByte === 0x77) {
+        return this.parse0x77();
+      }
+
+      // UDS кадры (0x80 и выше)
+      if (firstByte >= 0x80) {
+        return this.parseUDS();
+      }
+
+      // Неизвестный байт - выбросить ОДИН байт и продолжить
+      const dropped = this.buffer.shift()!;
+      logService.warn('PROTO', `Unknown byte dropped: 0x${dropped.toString(16).toUpperCase()}`);
+      // Продолжаем цикл для поиска следующего валидного байта
     }
-
-    // Кадр 0x66 - Запрос экрана
-    if (firstByte === 0x66) {
-      return this.parse0x66();
-    }
-
-    // Кадр 0x77 - Конфигурация
-    if (firstByte === 0x77) {
-      return this.parse0x77();
-    }
-
-    // UDS кадры (0x80-0x9F)
-    if ((firstByte & 0x80) !== 0) {
-      return this.parseUDS();
-    }
-
-    // Неизвестный байт - выбросить
-    const dropped = this.buffer.shift()!;
-    logService.warn('PROTO', `Unknown byte dropped: 0x${dropped.toString(16).toUpperCase()}`);
+    
     return null;
   }
 
@@ -186,9 +189,10 @@ export class ProtocolParser {
    * Формат: [HDR] [DST] [SRC] [SID] [DATA...] [CHK]
    * HDR = 0x80 | (N-2), где N = количество байт от DST до последнего байта данных
    * 
-   * ВАЖНО: Ответы от блока приходят с DST=0xF1, SRC=0x28 (согласно "изменения.docx")
+   * ВАЖНО: Ответы от блока приходят с DST=0xF1, SRC=0x28 (согласно "добавка.docx")
    * Отправляем: DST=0x28, SRC=0xF0
    * Получаем: DST=0xF1, SRC=0x28
+   * НЕ ФИЛЬТРУЕМ адреса - принимаем все!
    */
   private parseUDS(): UDSFrame | null {
     if (this.buffer.length < 4) return null;
@@ -215,7 +219,12 @@ export class ProtocolParser {
     const sid = packet[3];
     const data = Array.from(packet.slice(4, totalLen - 1));
 
-    logService.success('PROTO', `UDS frame: DST=0x${dst.toString(16).toUpperCase()} SRC=0x${src.toString(16).toUpperCase()} SID=0x${sid.toString(16).toUpperCase()}, CHK OK`);
+    // Логируем правильные ответы от блока
+    if (dst === 0xF1 && src === 0x28) {
+      logService.success('PROTO', `✓ UDS Response from device: DST=0x${dst.toString(16).toUpperCase()} SRC=0x${src.toString(16).toUpperCase()} SID=0x${sid.toString(16).toUpperCase()}, CHK OK`);
+    } else {
+      logService.info('PROTO', `UDS frame: DST=0x${dst.toString(16).toUpperCase()} SRC=0x${src.toString(16).toUpperCase()} SID=0x${sid.toString(16).toUpperCase()}, CHK OK`);
+    }
 
     return {
       type: 'UDS',
