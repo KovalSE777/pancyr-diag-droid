@@ -17,9 +17,9 @@ export class CapacitorBluetoothService {
   private readonly HM10_SERVICE_UUID = '0000ffe0-0000-1000-8000-00805f9b34fb';
   private readonly HM10_DATA_CHAR_UUID = '0000ffe1-0000-1000-8000-00805f9b34fb';
 
-  // UDS protocol addresses
-  private readonly BSKU_ADDRESS = 0x2A;
-  private readonly TESTER_ADDRESS = 0xF1;
+  // UDS protocol addresses (from firmware pprpzu_45k22_Blt_Pancir-7.c)
+  private readonly BSKU_ADDRESS = 0x28;  // ECU address (DST in request)
+  private readonly TESTER_ADDRESS = 0xF0; // Tester address (SRC in request)
 
   // RX packet assembly buffer and helpers
   private rxBuffer: number[] = [];
@@ -378,13 +378,21 @@ export class CapacitorBluetoothService {
 
       logService.info('BLE-RX', `UDS: DST=0x${dst.toString(16).toUpperCase()} SRC=0x${src.toString(16).toUpperCase()} service=0x${service.toString(16).toUpperCase()}`);
 
-      // Parse ReadDataByLocalIdentifier response (0x21 0x01)
-      if (service === 0x21 && packet[4] === 0x01) {
-        const body = new Uint8Array(packet.slice(5, totalLen - 1));
+      // Firmware sends response with DST=0xF1, SRC=0x28
+      // Verify this is a response meant for us
+      if (dst !== 0xF1 || src !== 0x28) {
+        logService.warn('BLE-RX', `Unexpected addresses DST=0x${dst.toString(16).toUpperCase()} SRC=0x${src.toString(16).toUpperCase()}, expected DST=0xF1 SRC=0x28`);
+      }
+
+      // Parse ReadDataByLocalIdentifier response (0x61 = positive response to 0x21)
+      // Firmware responds with 0x61 for successful readDataByLocalIdentifier (see line 715 in firmware)
+      if (service === 0x61 && packet.length >= 6) {
+        // Data starts at index 4 (after LEN, DST, SRC, SERVICE)
+        const body = new Uint8Array(packet.slice(4, totalLen - 1));
         const diagnosticData = BluetoothDataParser.parseData(body, this.systemType);
         if (diagnosticData) {
           this.latestData = diagnosticData;
-          logService.success('BLE-RX', 'diagnostic parsed from UDS');
+          logService.success('BLE-RX', `diagnostic parsed from UDS (${body.length} bytes)`);
         } else {
           logService.warn('BLE-RX', 'diagnostic parse failed');
         }

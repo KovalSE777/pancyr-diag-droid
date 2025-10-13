@@ -7,72 +7,81 @@ import { DiagnosticData, ComponentStatus } from '@/types/bluetooth';
 export class BluetoothDataParser {
   /**
    * Парсит байтовый массив данных от БСКУ в структуру DiagnosticData
-   * @param data - Байтовый массив данных из Bluetooth пакета
+   * На основе прошивки pprpzu_45k22_Blt_Pancir-7.c (строки 1118-1148)
+   * Данные приходят после UDS заголовка (индекс 0 = res2[4] в прошивке)
+   * 
+   * @param data - Байтовый массив данных из Bluetooth пакета (без UDS заголовка)
    * @param systemType - Тип системы ('SKA' или 'SKE')
    * @returns Распарсенные диагностические данные
    */
   static parseData(data: Uint8Array, systemType: 'SKA' | 'SKE' = 'SKA'): DiagnosticData | null {
-    // Проверка минимальной длины пакета (минимум 26 байтов данных)
+    // Проверка минимальной длины пакета (минимум 26 байтов данных согласно прошивке)
     if (data.length < 26) {
       console.error('Packet too short:', data.length, 'expected at least 26 bytes');
       return null;
     }
 
     console.log('Parsing diagnostic data, packet length:', data.length, 'bytes');
+    console.log('Raw data (first 30 bytes):', Array.from(data.slice(0, 30)).map(b => '0x' + b.toString(16).padStart(2, '0')).join(' '));
 
     let index = 0;
     
-    // Парсинг напряжений (байты 0-3)
-    const U_U_UM1 = data[index++]; // Напряжение конденсатора (ADC значение)
-    const U_U_UM2 = data[index++]; // Напряжение испарителя
-    const U_U_UM3 = data[index++]; // Напряжение компрессора
-    const U_U_FU = data[index++];  // Эталонное напряжение питания (27В)
+    // Согласно прошивке pprpzu_45k22_Blt_Pancir-7.c строки 1118-1148:
+    // ip2=4 (начинаем после UDS заголовка LEN, DST, SRC, SERVICE)
+    
+    // Байты 0-3: Напряжения ADC (U_U_UM1, U_U_UM2, U_U_UM3, U_U_FU)
+    const U_U_UM1 = data[index++]; // res2[ip2++] - Напряжение конденсатора
+    const U_U_UM2 = data[index++]; // res2[ip2++] - Напряжение испарителя
+    const U_U_UM3 = data[index++]; // res2[ip2++] - Напряжение компрессора
+    const U_U_FU = data[index++];  // res2[ip2++] - Эталонное напряжение питания (27В)
 
-    // Управление реле и индикацией (байты 4-5)
-    const uUPR_BT = data[index++];  // Управление реле (биты: M1..M5, CMP)
-    const uUPR_IND = data[index++]; // Управление индикацией (IND1..IND4)
+    // Байты 4-5: Управление реле и индикацией
+    const uUPR_BT = data[index++];  // res2[ip2++] - Управление реле (биты: M1..M5, CMP)
+    const uUPR_IND = data[index++]; // res2[ip2++] - Управление индикацией (IND1..IND4)
 
-    // Статусные биты (байт 6)
-    const sDAT_BIT = data[index++]; // D_DAVL, VKL_CMP, BL_2, K_NORM, FTD_NORM, BL2_1vnt, NO_V_CMP
+    // Байт 6: Статусные биты
+    const sDAT_BIT = data[index++]; // res2[ip2++] - D_DAVL, VKL_CMP, BL_2, K_NORM, FTD_NORM, BL2_1vnt, NO_V_CMP
 
-    // Режим работы компрессора (байт 7)
-    const work_rej_cmp = data[index++];
+    // Байт 7: Режим работы компрессора
+    const work_rej_cmp = data[index++]; // res2[ip2++]
 
-    // Падения напряжения (байты 8-10)
-    const vdlt_cnd_i = data[index++]; // Падение напряжения конденсатора
-    const vdlt_isp_i = data[index++]; // Падение напряжения испарителя
-    const vdlt_cmp_i = data[index++]; // Падение напряжения компрессора
+    // Байты 8-10: Падения напряжения (текущие значения)
+    const vdlt_cnd_i = data[index++]; // res2[ip2++] - Падение напряжения конденсатора
+    const vdlt_isp_i = data[index++]; // res2[ip2++] - Падение напряжения испарителя
+    const vdlt_cmp_i = data[index++]; // res2[ip2++] - Падение напряжения компрессора
 
-    // Таймер отключения (байт 11)
-    const timer_off = data[index++];
+    // Байт 11: Таймер отключения
+    const timer_off = data[index++]; // res2[ip2++]
 
-    // Режимы работы (байты 12-13)
-    const work_rej_cnd = data[index++]; // Режим работы конденсатора
-    const work_rej_isp = data[index++]; // Режим работы испарителя
+    // Байты 12-13: Режимы работы конденсатора и испарителя
+    const work_rej_cnd = data[index++]; // res2[ip2++] - Режим работы конденсатора
+    const work_rej_isp = data[index++]; // res2[ip2++] - Режим работы испарителя
 
-    // Заданные падения напряжения (байты 14-16)
-    const edlt_cnd_i = data[index++];
-    const edlt_isp_i = data[index++];
-    const edlt_cmp_i = data[index++];
+    // Байты 14-16: Заданные падения напряжения (эталоны)
+    const edlt_cnd_i = data[index++]; // res2[ip2++]
+    const edlt_isp_i = data[index++]; // res2[ip2++]
+    const edlt_cmp_i = data[index++]; // res2[ip2++]
 
-    // Количество вентиляторов и скорость (байты 17-18)
-    const n_V_cnd = data[index++]; // Активные вентиляторы конденсатора
-    const PWM_spd = data[index++] as 1 | 2; // Скорость PWM (1=медленно, 2=быстро)
+    // Байт 17: Количество активных вентиляторов конденсатора
+    const n_V_cnd = data[index++]; // res2[ip2++]
+    
+    // Байт 18: Скорость PWM
+    const PWM_spd = data[index++] as 1 | 2; // res2[ip2++] - (1=медленно, 2=быстро)
 
-    // ШИМ параметры (байты 19-20)
-    const s1_TMR2 = data[index++]; // Длительность высокого уровня
-    const s0_TMR2 = data[index++]; // Длительность низкого уровня
+    // Байты 19-20: ШИМ параметры
+    const s1_TMR2 = data[index++]; // res2[ip2++] - Длительность высокого уровня
+    const s0_TMR2 = data[index++]; // res2[ip2++] - Длительность низкого уровня
 
-    // Температуры (байты 21-22)
-    const T_air = data[index++];  // Температура воздуха
-    const T_isp = data[index++];  // Температура испарителя
+    // Байты 21-22: Температуры
+    const T_air = data[index++];  // res2[ip2++] - Температура воздуха
+    const T_isp = data[index++];  // res2[ip2++] - Температура испарителя
 
-    // Давление (байт 23)
-    const U_davl = data[index++]; // Датчик давления (0-255)
+    // Байт 23: Датчик давления
+    const U_davl = data[index++]; // res2[ip2++] - Датчик давления (0-255)
 
-    // Статусы компонентов (байты 24-25)
-    const iSOST_UPR1 = data[index++]; // Статус управления 1
-    const iSOST_UPR2 = data[index++]; // Статус управления 2
+    // Байты 24-25: Статусы компонентов
+    const iSOST_UPR1 = data[index++]; // res2[ip2++] - Статус управления 1
+    const iSOST_UPR2 = data[index++]; // res2[ip2++] - Статус управления 2
 
     // Дополнительные измерения (опциональные, если есть в пакете)
     // Примечание: эти данные могут не передаваться, используем systemType для определения
