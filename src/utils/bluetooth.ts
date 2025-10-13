@@ -1,6 +1,6 @@
 /// <reference path="../types/web-bluetooth.d.ts" />
 import { DiagnosticData } from '@/types/bluetooth';
-import { ProtocolParser, Frame0x88, Frame0x66, Frame0x77 } from './protocol-parser';
+import { ProtocolParser, ParsedFrame } from './protocol-parser';
 import { Screen4Parser } from './screen4-parser';
 import { appendChecksum, toHex } from './checksum';
 import { logService } from './log-service';
@@ -119,25 +119,19 @@ export class PantsirBluetoothService {
     const chunk = new Uint8Array(value.buffer);
     logService.info('BLE-RX', `chunk ${chunk.length}b: ${toHex(chunk)}`);
 
-    // Добавляем данные в парсер
-    this.parser.addData(chunk);
-
-    // Пытаемся извлечь кадры
-    let frame;
-    while ((frame = this.parser.parseNextFrame()) !== null) {
-      this.handleParsedFrame(frame);
-    }
+    // Передаем данные в парсер с callback
+    this.parser.feed(chunk, (frame) => this.handleParsedFrame(frame));
   }
 
-  private handleParsedFrame(frame: any): void {
+  private handleParsedFrame(frame: ParsedFrame): void {
     // Кадр 0x88 - телеметрия экрана
-    if (frame.type === 0x88) {
-      const f = frame as Frame0x88;
-      logService.info('BLE-RX', `0x88 telemetry: screen=${f.screen}, payload=${f.payload.length}b`);
+    if (frame.type === 'TEL_88') {
+      const nScr = frame.info?.nScr;
+      logService.success('PROTO', `✓ 0x88 Screen=${nScr}, CHK=${frame.ok ? 'OK' : 'FAIL'}`);
       
-      if (f.screen === 4) {
+      if (nScr === 4 && frame.ok) {
         // Парсим экран 4
-        const diagnosticData = Screen4Parser.parse(f.payload, this.systemType);
+        const diagnosticData = Screen4Parser.parse(frame.raw.slice(3, 3 + (frame.raw[2] & 0xFF)), this.systemType);
         if (diagnosticData) {
           this.latestData = diagnosticData;
           logService.success('BLE-RX', 'Screen 4 data parsed successfully');
@@ -149,35 +143,42 @@ export class PantsirBluetoothService {
     }
 
     // Кадр 0x66 - запрос экрана
-    else if (frame.type === 0x66) {
-      const f = frame as Frame0x66;
-      logService.info('BLE-RX', `0x66 screen request: screen=${f.screen}`);
+    else if (frame.type === 'SCR_66') {
+      const nScr = frame.info?.nScr ?? 0;
+      logService.success('PROTO', `✓ 0x66 SCR_${nScr}`);
       
       // Отправляем ответ UOKS
-      this.sendASCII(`UOKS${String.fromCharCode(f.screen)}`).catch(e => 
+      this.sendASCII(`UOKS${String.fromCharCode(nScr)}`).catch(e => 
         logService.error('BLE-TX', `UOKS send failed: ${e}`)
       );
     }
 
     // Кадр 0x77 - конфигурация
-    else if (frame.type === 0x77) {
-      const f = frame as Frame0x77;
-      logService.info('BLE-RX', `0x77 config: pkg=${f.packageNum}, payload=${f.payload.length}b`);
+    else if (frame.type === 'CFG_77') {
+      const nPak = frame.info?.nPak ?? 0;
+      logService.success('PROTO', `✓ 0x77 Package=${nPak}, CHK=${frame.ok ? 'OK' : 'FAIL'}`);
       
       // Отправляем ответ UOKP
-      this.sendASCII(`UOKP${String.fromCharCode(f.packageNum)}`).catch(e =>
+      this.sendASCII(`UOKP${String.fromCharCode(nPak)}`).catch(e =>
         logService.error('BLE-TX', `UOKP send failed: ${e}`)
       );
     }
 
-    // UDS кадры (опционально)
-    else if (frame.type === 'UDS') {
-      logService.info('BLE-RX', `UDS frame: DST=0x${frame.dst.toString(16)} SRC=0x${frame.src.toString(16)} SVC=0x${frame.service.toString(16)}`);
+    // UDS кадры
+    else if (frame.type === 'UDS_80P') {
+      const dst = frame.info?.dst ?? 0;
+      const src = frame.info?.src ?? 0;
+      const sid = frame.info?.sid ?? 0;
       
-      // Ответы ждём с DST=0xF1, SRC=0x28 (согласно документу)
-      if (frame.dst === 0xF1 && frame.src === 0x28) {
-        logService.success('BLE-RX', 'UDS response received from BSKU');
+      if (dst === 0xF1 && src === 0x28) {
+        logService.success('BLE-RX', `✓ UDS Response: DST=0x${dst.toString(16).toUpperCase()} SRC=0x${src.toString(16).toUpperCase()} SID=0x${sid.toString(16).toUpperCase()}, CHK=${frame.ok ? 'OK' : 'FAIL'}`);
+      } else {
+        logService.info('BLE-RX', `UDS: DST=0x${dst.toString(16).toUpperCase()} SRC=0x${src.toString(16).toUpperCase()} SID=0x${sid.toString(16).toUpperCase()}, CHK=${frame.ok ? 'OK' : 'FAIL'}`);
       }
+    }
+    
+    else if (!frame.ok) {
+      logService.error('PROTO', `✗ Checksum FAIL`);
     }
   }
 
