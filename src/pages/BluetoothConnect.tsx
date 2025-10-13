@@ -9,7 +9,8 @@ import { useToast } from "@/hooks/use-toast";
 import bluetoothIcon from "@/assets/bluetooth-icon.png";
 import { Capacitor } from "@capacitor/core";
 import { DebugLogPanel } from "@/components/diagnostics/DebugLogPanel";
-
+import { BleClient } from '@capacitor-community/bluetooth-le';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 const BluetoothConnect = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -18,83 +19,111 @@ const BluetoothConnect = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'searching' | 'connecting' | 'connected' | 'error'>('idle');
   
+  type DiscoveredDevice = { deviceId: string; name?: string; rssi?: number };
+  const [devicePickerOpen, setDevicePickerOpen] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
+  const [devices, setDevices] = useState<DiscoveredDevice[]>([]);
+  
   const systemType = searchParams.get('type') || 'ska';
 
   const handleConnect = async () => {
-    setIsConnecting(true);
-    setConnectionStatus('searching');
-    
     try {
-      // Check if we're running on native platform (iOS/Android)
       const isNative = Capacitor.isNativePlatform();
-      
+
       if (isNative) {
-        // Use Capacitor Bluetooth on native platforms
-        toast({
-          title: "Поиск устройства...",
-          description: "Включите Bluetooth на БСКУ",
-        });
+        // Native: show device picker and scan; pairing/PIN prompt will be handled by OS upon connect
+        setDevicePickerOpen(true);
+        setConnectionStatus('idle');
+        setIsConnecting(false);
+        await startScan();
+        return;
+      }
 
-        setConnectionStatus('connecting');
-        
-        const connected = await capacitorBluetoothService.connect(systemType.toUpperCase() as 'SKA' | 'SKE');
-        
-        if (connected) {
-          setConnectionStatus('connected');
-          setIsConnected(true);
-          
-          toast({
-            title: "Подключено успешно",
-            description: "Связь с БСКУ установлена",
-          });
+      // Web: use browser chooser dialog
+      setIsConnecting(true);
+      setConnectionStatus('searching');
 
-          setTimeout(() => {
-            navigate(`/diagnostics?type=${systemType}`);
-          }, 1500);
-        } else {
-          throw new Error('Не удалось подключиться к устройству');
-        }
+      if (!navigator.bluetooth) {
+        throw new Error('Web Bluetooth API не поддерживается в этом браузере. Используйте Chrome на Android или установите мобильное приложение.');
+      }
+
+      toast({ title: 'Поиск устройства...', description: 'Включите Bluetooth на БСКУ' });
+      setConnectionStatus('connecting');
+
+      const connected = await bluetoothService.connect(systemType.toUpperCase() as 'SKA' | 'SKE');
+      if (connected) {
+        setConnectionStatus('connected');
+        setIsConnected(true);
+        toast({ title: 'Подключено успешно', description: 'Связь с БСКУ установлена' });
+        setTimeout(() => navigate(`/diagnostics?type=${systemType}`), 1200);
       } else {
-        // Use Web Bluetooth API on web
-        if (!navigator.bluetooth) {
-          throw new Error('Web Bluetooth API не поддерживается в этом браузере. Используйте Chrome на Android или установите мобильное приложение.');
-        }
-
-        toast({
-          title: "Поиск устройства...",
-          description: "Включите Bluetooth на БСКУ",
-        });
-
-        setConnectionStatus('connecting');
-        
-        const connected = await bluetoothService.connect(systemType.toUpperCase() as 'SKA' | 'SKE');
-        
-        if (connected) {
-          setConnectionStatus('connected');
-          setIsConnected(true);
-          
-          toast({
-            title: "Подключено успешно",
-            description: "Связь с БСКУ установлена",
-          });
-
-          setTimeout(() => {
-            navigate(`/diagnostics?type=${systemType}`);
-          }, 1500);
-        } else {
-          throw new Error('Не удалось подключиться к устройству');
-        }
+        throw new Error('Не удалось подключиться к устройству');
       }
     } catch (error) {
       setConnectionStatus('error');
       console.error('Connection error:', error);
-      
       toast({
-        title: "Ошибка подключения",
+        title: 'Ошибка подключения',
         description: error instanceof Error ? error.message : 'Не удалось подключиться к БСКУ',
-        variant: "destructive",
+        variant: 'destructive',
       });
-      
+      setIsConnecting(false);
+    }
+  };
+
+  // Native scan and connect flow
+  const startScan = async () => {
+    try {
+      setIsScanning(true);
+      setDevices([]);
+      await BleClient.initialize();
+      await BleClient.requestLEScan({}, (result) => {
+        setDevices((prev) => {
+          if (prev.find((d) => d.deviceId === result.device.deviceId)) return prev;
+          return [
+            ...prev,
+            { deviceId: result.device.deviceId, name: result.device.name, rssi: result.rssi },
+          ];
+        });
+      });
+      setTimeout(async () => {
+        try { await BleClient.stopLEScan(); } catch {}
+        setIsScanning(false);
+      }, 8000);
+    } catch (e) {
+      console.error('Scan error:', e);
+      setIsScanning(false);
+      toast({ title: 'Ошибка сканирования', description: 'Не удалось начать сканирование', variant: 'destructive' });
+    }
+  };
+
+  const stopScan = async () => {
+    try { await BleClient.stopLEScan(); } catch {}
+    setIsScanning(false);
+  };
+
+  const connectToDevice = async (deviceId: string) => {
+    try {
+      await stopScan();
+      setIsConnecting(true);
+      setConnectionStatus('connecting');
+      toast({ title: 'Подключение...', description: 'Может появиться запрос PIN — введите 1234' });
+
+      const ok = await capacitorBluetoothService.connectToDeviceId(deviceId, systemType.toUpperCase() as 'SKA' | 'SKE');
+      if (ok) {
+        setConnectionStatus('connected');
+        setIsConnected(true);
+        setDevicePickerOpen(false);
+        toast({ title: 'Подключено успешно', description: 'Связь с БСКУ установлена' });
+        setTimeout(() => navigate(`/diagnostics?type=${systemType}`), 1200);
+      } else {
+        throw new Error('Не удалось подключиться к выбранному устройству');
+      }
+    } catch (e) {
+      console.error('Connect selected error:', e);
+      setConnectionStatus('error');
+      toast({ title: 'Ошибка подключения', description: e instanceof Error ? e.message : 'Сбой подключения', variant: 'destructive' });
+    } finally {
       setIsConnecting(false);
     }
   };
@@ -246,6 +275,43 @@ const BluetoothConnect = () => {
           </div>
         </Card>
       </main>
+
+      {/* Device picker (Native) */}
+      <Dialog open={devicePickerOpen} onOpenChange={(o) => { setDevicePickerOpen(o); if (!o) stopScan(); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Выберите устройство</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Для некоторых модулей Android запросит PIN — введите 1234.
+            </p>
+            <div className="max-h-60 overflow-auto border rounded-md divide-y">
+              {devices.length === 0 ? (
+                <div className="p-4 text-sm text-muted-foreground text-center">
+                  {isScanning ? 'Сканирование...' : 'Устройства не найдены'}
+                </div>
+              ) : (
+                devices.map((d) => (
+                  <div key={d.deviceId} className="p-3 flex items-center justify-between">
+                    <div>
+                      <div className="font-medium text-sm">{d.name || 'Неизвестное устройство'}</div>
+                      <div className="text-xs text-muted-foreground font-mono">{d.deviceId}</div>
+                    </div>
+                    <Button size="sm" onClick={() => connectToDevice(d.deviceId)} disabled={isConnecting}>
+                      Подключить
+                    </Button>
+                  </div>
+                ))
+              )}
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={startScan} disabled={isScanning}>Обновить</Button>
+              <Button variant="ghost" onClick={() => setDevicePickerOpen(false)}>Отмена</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
       
       <DebugLogPanel />
     </div>
