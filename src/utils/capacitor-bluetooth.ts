@@ -32,28 +32,51 @@ export class CapacitorBluetoothService {
       await this.initialize();
       console.log('🔵 [BLE Native] BLE initialized');
       
-      console.log('🔵 [BLE Native] Requesting device with UART service UUID:', this.UART_SERVICE_UUID);
+      console.log('🔵 [BLE Native] Starting BLE scan (all devices)...');
       
-      // Request only BLE devices that advertise the Nordic UART Service (prevents classic HC-05 from appearing)
-      const device = await BleClient.requestDevice({
-        services: [this.UART_SERVICE_UUID],
+      // Scan for all BLE devices (no filter)
+      const devices: Array<{deviceId: string, name?: string, rssi?: number}> = [];
+      
+      await BleClient.requestLEScan({}, (result) => {
+        const exists = devices.find(d => d.deviceId === result.device.deviceId);
+        if (!exists) {
+          devices.push({
+            deviceId: result.device.deviceId,
+            name: result.device.name,
+            rssi: result.rssi
+          });
+          console.log('🔵 [BLE Native] Found device:', result.device.name || result.device.deviceId, 'RSSI:', result.rssi);
+        }
       });
       
-      if (!device.deviceId) {
-        throw new Error('No device selected');
+      // Scan for 5 seconds
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      await BleClient.stopLEScan();
+      
+      console.log(`🔵 [BLE Native] Scan complete. Found ${devices.length} devices`);
+      logService.info('BLE Native', `Found ${devices.length} devices`);
+      
+      if (devices.length === 0) {
+        throw new Error('Устройства не найдены. Убедитесь, что Bluetooth включен на БСКУ.');
       }
+      
+      // Filter out HC-05 (classic Bluetooth)
+      const bleDevices = devices.filter(d => {
+        const name = d.name || '';
+        return !/HC[-_ ]?05/i.test(name);
+      });
+      
+      if (bleDevices.length === 0) {
+        throw new Error('BLE устройства не найдены. Обнаружены только модули HC-05 (классический Bluetooth). Требуется BLE-модуль.');
+      }
+      
+      // Auto-connect to first BLE device or show picker
+      const device = bleDevices[0];
+      this.deviceId = device.deviceId;
       
       const selectedName = device.name || device.deviceId;
       logService.success('BLE Native', `Device selected: ${selectedName}`);
       console.log('🔵 [BLE Native] Device selected:', selectedName);
-      
-      // Extra guard: classic HC-05 modules are not BLE and do not expose GATT characteristics.
-      // If the user somehow sees/selects it, abort with a helpful error.
-      if (selectedName && /HC[-_ ]?05/i.test(selectedName)) {
-        throw new Error('Обнаружен модуль HC-05 (классический Bluetooth). Нужен BLE-модуль с сервисом Nordic UART (например, ESP32/HM-10).');
-      }
-      
-      this.deviceId = device.deviceId;
       
       // Connect to device
       console.log('🔵 [BLE Native] Connecting to device...');
