@@ -124,19 +124,30 @@ export class CapacitorBluetoothService {
                 break;
               }
             }
-            // HM-10 (FFE0/FFE1/FFE2)
+            // HM-10 (FFE0/FFE1/FFE2) — detect by properties, not fixed roles
             if (this.isUuid(su, 'ffe0')) {
-              const ffe1 = s.characteristics?.find(c => this.isUuid(c.uuid, 'ffe1'));
-              const ffe2 = s.characteristics?.find(c => this.isUuid(c.uuid, 'ffe2'));
-              if (ffe1 && ffe2) {
-                // FFE1: READ+NOTIFY (RX), FFE2: WRITE (TX)
+              const chars = s.characteristics || [];
+              const ffe1 = chars.find((c: any) => this.isUuid(c.uuid, 'ffe1')) as any;
+              const ffe2 = chars.find((c: any) => this.isUuid(c.uuid, 'ffe2')) as any;
+
+              const describe = (c: any) => c ? `r=${!!c.properties?.read} w=${!!c.properties?.write} wn=${!!c.properties?.writeWithoutResponse} n=${!!c.properties?.notify}` : 'absent';
+              logService.info('BLE Native', `HM10 props ffe1[${describe(ffe1)}] ffe2[${describe(ffe2)}]`);
+
+              // RX = characteristic with NOTIFY
+              let rx = [ffe1, ffe2].find((c: any) => c && c.properties?.notify) || null;
+              // TX = characteristic with WRITE/WRITE_NO_RESP not equal to RX; fallback to RX if only one char
+              let tx = [ffe1, ffe2].find((c: any) => c && (c.properties?.write || c.properties?.writeWithoutResponse) && c !== rx) || rx;
+
+              if (rx) {
                 profile = 'HM10';
-                rxChar = this.to128('ffe1');
-                txChar = this.to128('ffe2');
+                rxChar = this.to128((rx as any).uuid);
+                txChar = this.to128(((tx as any)?.uuid) || (rx as any).uuid);
                 svcUuid = this.to128('ffe0');
                 break;
-              } else if (ffe1) {
-                // Fallback: single char FFE1 (some HM-10 variants)
+              }
+
+              // Fallbacks (very old clones): only ffe1 exists
+              if (ffe1) {
                 profile = 'HM10';
                 rxChar = this.to128('ffe1');
                 txChar = this.to128('ffe1');
@@ -162,6 +173,7 @@ export class CapacitorBluetoothService {
               this.UART_RX_CHAR_UUID,
               (value) => this.handleDataReceived(value)
             );
+            logService.success('BLE Native', `notifications started: svc=${this.UART_SERVICE_UUID} rx=${this.UART_RX_CHAR_UUID}`);
 
             logService.success('BLE Native', 'Bluetooth connected successfully');
             return true;
@@ -219,19 +231,27 @@ export class CapacitorBluetoothService {
             break;
           }
         }
-        // HM-10 (FFE0/FFE1/FFE2)
+        // HM-10 (FFE0/FFE1/FFE2) — detect by properties
         if (this.isUuid(su, 'ffe0')) {
-          const ffe1 = s.characteristics?.find(c => this.isUuid(c.uuid, 'ffe1'));
-          const ffe2 = s.characteristics?.find(c => this.isUuid(c.uuid, 'ffe2'));
-          if (ffe1 && ffe2) {
-            // FFE1: READ+NOTIFY (RX), FFE2: WRITE (TX)
+          const chars = s.characteristics || [];
+          const ffe1 = chars.find((c: any) => this.isUuid(c.uuid, 'ffe1')) as any;
+          const ffe2 = chars.find((c: any) => this.isUuid(c.uuid, 'ffe2')) as any;
+
+          const describe = (c: any) => c ? `r=${!!c.properties?.read} w=${!!c.properties?.write} wn=${!!c.properties?.writeWithoutResponse} n=${!!c.properties?.notify}` : 'absent';
+          logService.info('BLE Native', `HM10 props ffe1[${describe(ffe1)}] ffe2[${describe(ffe2)}]`);
+
+          let rx = [ffe1, ffe2].find((c: any) => c && c.properties?.notify) || null;
+          let tx = [ffe1, ffe2].find((c: any) => c && (c.properties?.write || c.properties?.writeWithoutResponse) && c !== rx) || rx;
+
+          if (rx) {
             profile = 'HM10';
-            rxChar = this.to128('ffe1');
-            txChar = this.to128('ffe2');
+            rxChar = this.to128((rx as any).uuid);
+            txChar = this.to128(((tx as any)?.uuid) || (rx as any).uuid);
             svcUuid = this.to128('ffe0');
             break;
-          } else if (ffe1) {
-            // Fallback: single char FFE1 (some HM-10 variants)
+          }
+
+          if (ffe1) {
             profile = 'HM10';
             rxChar = this.to128('ffe1');
             txChar = this.to128('ffe1');
