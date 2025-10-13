@@ -105,7 +105,7 @@ export class PantsirBluetoothService {
     
     const data = new Uint8Array(value.buffer);
     const hexData = Array.from(data).map(b => b.toString(16).padStart(2, '0').toUpperCase()).join(' ');
-    logService.info('BLE', `Raw data received (${data.length} bytes): ${hexData}`);
+    logService.info('BLE-RX', `Raw chunk (${data.length} bytes): ${hexData}`);
     console.log('📥 [BLE] Raw data received (' + data.length + ' bytes):', hexData);
     
     const packet = this.parsePacket(data);
@@ -205,7 +205,7 @@ export class PantsirBluetoothService {
     const hexPacket = Array.from(packet).map(b => b.toString(16).padStart(2, '0').toUpperCase()).join(' ');
     const hexCommand = Array.from(commandData).map(b => b.toString(16).padStart(2, '0').toUpperCase()).join(' ');
     
-    logService.info('BLE', `Sending command to screen 0x${screen.toString(16).toUpperCase()}: [${hexCommand}]`);
+    logService.info('BLE-TX', `Sending -> screen 0x${screen.toString(16).toUpperCase()}: [${hexCommand}]`);
     console.log('📤 [BLE] Sending command:');
     console.log('  Screen: 0x' + screen.toString(16).toUpperCase());
     console.log('  Command data: [' + hexCommand + ']');
@@ -213,7 +213,7 @@ export class PantsirBluetoothService {
     console.log('  Checksum: 0x' + (checksum & 0xFF).toString(16).toUpperCase());
     
     await txCharacteristic.writeValue(packet);
-    logService.success('BLE', 'Command sent successfully');
+    logService.success('BLE-TX', 'sent');
     console.log('✅ [BLE] Command sent successfully');
   }
   
