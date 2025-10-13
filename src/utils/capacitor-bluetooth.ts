@@ -8,10 +8,13 @@ export class CapacitorBluetoothService {
   private latestData: DiagnosticData | null = null;
   private systemType: 'SKA' | 'SKE' = 'SKA';
   
-  // UART Service UUID (Nordic UART Service)
-  private readonly UART_SERVICE_UUID = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
-  private readonly UART_TX_CHAR_UUID = '6e400002-b5a3-f393-e0a9-e50e24dcca9e';
-  private readonly UART_RX_CHAR_UUID = '6e400003-b5a3-f393-e0a9-e50e24dcca9e';
+  // UART profiles (defaults to Nordic NUS; will auto-detect HM-10 too)
+  private UART_SERVICE_UUID = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
+  private UART_TX_CHAR_UUID = '6e400002-b5a3-f393-e0a9-e50e24dcca9e';
+  private UART_RX_CHAR_UUID = '6e400003-b5a3-f393-e0a9-e50e24dcca9e';
+  // HM-10 (FFE0/FFE1)
+  private readonly HM10_SERVICE_UUID = '0000ffe0-0000-1000-8000-00805f9b34fb';
+  private readonly HM10_DATA_CHAR_UUID = '0000ffe1-0000-1000-8000-00805f9b34fb';
   
   async initialize(): Promise<void> {
     try {
@@ -20,6 +23,19 @@ export class CapacitorBluetoothService {
       console.error('BLE initialization failed:', error);
       throw error;
     }
+  }
+
+  // Helpers
+  private to128(uuid: string): string {
+    if (!uuid) return uuid as string;
+    const u = uuid.toLowerCase();
+    if (u.includes('-')) return u;
+    const short = u.replace(/^0x/, '').padStart(4, '0');
+    return `0000${short}-0000-1000-8000-00805f9b34fb`;
+  }
+
+  private isUuid(a: string, b: string): boolean {
+    return this.to128(a) === this.to128(b);
   }
   
   async connect(systemType: 'SKA' | 'SKE' = 'SKA'): Promise<boolean> {
@@ -60,50 +76,92 @@ export class CapacitorBluetoothService {
         throw new Error('Устройства не найдены. Убедитесь, что Bluetooth включен на БСКУ.');
       }
       
-      // Filter out HC-05 (classic Bluetooth)
-      const bleDevices = devices.filter(d => {
-        const name = d.name || '';
-        return !/HC[-_ ]?05/i.test(name);
-      });
+      // Prepare candidate list (prefer stronger RSSI)
+      const bleDevices = [...devices].sort((a, b) => (b.rssi ?? -999) - (a.rssi ?? -999));
       
-      if (bleDevices.length === 0) {
-        throw new Error('BLE устройства не найдены. Обнаружены только модули HC-05 (классический Bluetooth). Требуется BLE-модуль.');
-      }
+      // Log top candidate
+      const top = bleDevices[0];
+      const selectedName = top ? (top.name || top.deviceId) : 'unknown';
+      logService.info('BLE Native', `Top candidate: ${selectedName} (RSSI: ${top?.rssi ?? 'n/a'})`);
+      console.log('🔵 [BLE Native] Top candidate:', selectedName, 'RSSI:', top?.rssi);
       
-      // Auto-connect to first BLE device or show picker
-      const device = bleDevices[0];
-      this.deviceId = device.deviceId;
-      
-      const selectedName = device.name || device.deviceId;
-      logService.success('BLE Native', `Device selected: ${selectedName}`);
-      console.log('🔵 [BLE Native] Device selected:', selectedName);
-      
-      // Connect to device
-      console.log('🔵 [BLE Native] Connecting to device...');
-      await BleClient.connect(this.deviceId, () => {
-        console.log('❌ [BLE Native] Device disconnected');
-        this.deviceId = null;
-      });
-      console.log('🔵 [BLE Native] Device connected');
-      
-      // Start notifications
-      console.log('🔵 [BLE Native] Starting notifications on RX characteristic:', this.UART_RX_CHAR_UUID);
-      await BleClient.startNotifications(
-        this.deviceId,
-        this.UART_SERVICE_UUID,
-        this.UART_RX_CHAR_UUID,
-        (value) => {
-          this.handleDataReceived(value);
+      // Try to connect to candidates and detect UART profile (Nordic NUS or HM-10 FFE0/FFE1)
+      for (const candidate of bleDevices) {
+        try {
+          console.log('🔵 [BLE Native] Trying device:', candidate.name || candidate.deviceId);
+          await BleClient.connect(candidate.deviceId, () => {
+            console.log('❌ [BLE Native] Device disconnected');
+            if (this.deviceId === candidate.deviceId) this.deviceId = null;
+          });
+
+          const services = await BleClient.getServices(candidate.deviceId);
+          const serviceUuids = services.map(s => s.uuid.toLowerCase());
+          console.log('🔵 [BLE Native] Services:', serviceUuids);
+
+          // Detect profile
+          let profile: 'NUS' | 'HM10' | null = null;
+          let rxChar: string | null = null;
+          let txChar: string | null = null;
+          let svcUuid: string | null = null;
+
+          for (const s of services) {
+            const su = s.uuid.toLowerCase();
+            // Nordic NUS
+            if (this.isUuid(su, '6e400001-b5a3-f393-e0a9-e50e24dcca9e')) {
+              const rx = s.characteristics?.find(c => this.isUuid(c.uuid, '6e400003-b5a3-f393-e0a9-e50e24dcca9e'));
+              const tx = s.characteristics?.find(c => this.isUuid(c.uuid, '6e400002-b5a3-f393-e0a9-e50e24dcca9e'));
+              if (rx && tx) {
+                profile = 'NUS';
+                rxChar = this.to128('6e400003-b5a3-f393-e0a9-e50e24dcca9e');
+                txChar = this.to128('6e400002-b5a3-f393-e0a9-e50e24dcca9e');
+                svcUuid = this.to128('6e400001-b5a3-f393-e0a9-e50e24dcca9e');
+                break;
+              }
+            }
+            // HM-10 (FFE0/FFE1)
+            if (this.isUuid(su, 'ffe0')) {
+              const ffe1 = s.characteristics?.find(c => this.isUuid(c.uuid, 'ffe1'));
+              if (ffe1) {
+                profile = 'HM10';
+                rxChar = this.to128('ffe1');
+                txChar = this.to128('ffe1');
+                svcUuid = this.to128('ffe0');
+                break;
+              }
+            }
+          }
+
+          if (profile) {
+            // Save selected device and profile
+            this.deviceId = candidate.deviceId;
+            this.UART_SERVICE_UUID = svcUuid!;
+            this.UART_RX_CHAR_UUID = rxChar!;
+            this.UART_TX_CHAR_UUID = txChar!;
+            logService.success('BLE Native', `Profile detected: ${profile}. Service=${this.UART_SERVICE_UUID}, RX=${this.UART_RX_CHAR_UUID}, TX=${this.UART_TX_CHAR_UUID}`);
+            console.log('✅ [BLE Native] Profile detected:', profile);
+
+            // Start notifications
+            await BleClient.startNotifications(
+              this.deviceId,
+              this.UART_SERVICE_UUID,
+              this.UART_RX_CHAR_UUID,
+              (value) => this.handleDataReceived(value)
+            );
+
+            logService.success('BLE Native', 'Bluetooth connected successfully');
+            return true;
+          }
+
+          // No profile -> disconnect and try next
+          await BleClient.disconnect(candidate.deviceId).catch(() => {});
+          console.warn('⚠️ [BLE Native] UART profile not found on device; trying next');
+        } catch (e) {
+          console.warn('⚠️ [BLE Native] Failed to connect candidate, trying next:', e);
+          try { await BleClient.disconnect(candidate.deviceId); } catch {}
         }
-      );
-      
-      logService.success('BLE Native', 'Bluetooth connected successfully');
-      logService.info('BLE Native', `TX UUID: ${this.UART_TX_CHAR_UUID}`);
-      logService.info('BLE Native', `RX UUID: ${this.UART_RX_CHAR_UUID}`);
-      console.log('✅ [BLE Native] Bluetooth connected successfully');
-      console.log('🔵 [BLE Native] TX UUID:', this.UART_TX_CHAR_UUID);
-      console.log('🔵 [BLE Native] RX UUID:', this.UART_RX_CHAR_UUID);
-      return true;
+      }
+
+      throw new Error('Подходящий BLE UART сервис не найден. Проверьте, что модуль поддерживает Nordic NUS или HM-10 (FFE0/FFE1).');
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
       logService.error('BLE Native', `Connection failed: ${errorMsg}`);
@@ -221,13 +279,23 @@ export class CapacitorBluetoothService {
     const dataView = new DataView(packet.buffer);
     
     try {
-      // Write to TX characteristic
-      await BleClient.write(
-        this.deviceId,
-        this.UART_SERVICE_UUID,
-        this.UART_TX_CHAR_UUID,
-        dataView
-      );
+      // Write to TX characteristic (prefer write with response, fallback to withoutResponse)
+      try {
+        await BleClient.write(
+          this.deviceId,
+          this.UART_SERVICE_UUID,
+          this.UART_TX_CHAR_UUID,
+          dataView
+        );
+      } catch (primaryError) {
+        console.warn('⚠️ [BLE Native] write() failed, retrying with writeWithoutResponse...', primaryError);
+        await BleClient.writeWithoutResponse(
+          this.deviceId!,
+          this.UART_SERVICE_UUID,
+          this.UART_TX_CHAR_UUID,
+          dataView
+        );
+      }
       logService.success('BLE Native', 'Command sent successfully');
       console.log('✅ [BLE Native] Command sent successfully');
     } catch (error) {
