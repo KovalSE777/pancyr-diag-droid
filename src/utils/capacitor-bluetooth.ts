@@ -8,6 +8,7 @@ export class CapacitorBluetoothService {
   private latestData: DiagnosticData | null = null;
   private systemType: 'SKA' | 'SKE' = 'SKA';
   private keepAliveInterval: any = null;
+  private pollInterval: any = null;
   
   // UART profiles (defaults to Nordic NUS; will auto-detect HM-10 too)
   private UART_SERVICE_UUID = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
@@ -17,9 +18,9 @@ export class CapacitorBluetoothService {
   private readonly HM10_SERVICE_UUID = '0000ffe0-0000-1000-8000-00805f9b34fb';
   private readonly HM10_DATA_CHAR_UUID = '0000ffe1-0000-1000-8000-00805f9b34fb';
 
-  // UDS protocol addresses (from firmware pprpzu_45k22_Blt_Pancir-7.c)
-  private readonly BSKU_ADDRESS = 0x28;  // ECU address (DST in request)
-  private readonly TESTER_ADDRESS = 0xF0; // Tester address (SRC in request)
+  // UDS protocol addresses (from firmware pprpzu_45k22_Blt_Pancir-7.c lines 1156-1157, 640, 715)
+  private readonly BSKU_ADDRESS = 0x2A;  // ECU address (DST in request, SRC in response)
+  private readonly TESTER_ADDRESS = 0xF1; // Tester address (SRC in request, DST in response)
 
   // RX packet assembly buffer and helpers
   private rxBuffer: number[] = [];
@@ -185,6 +186,9 @@ export class CapacitorBluetoothService {
             
             // Start keep-alive TesterPresent
             this.startKeepAlive();
+            
+            // Start auto-polling diagnostic data every 2 seconds
+            this.startDataPolling();
 
             logService.success('BLE Native', 'Bluetooth connected successfully');
             return true;
@@ -292,6 +296,9 @@ export class CapacitorBluetoothService {
           
           // Start keep-alive TesterPresent
           this.startKeepAlive();
+          
+          // Start auto-polling diagnostic data every 2 seconds
+          this.startDataPolling();
 
           logService.success('BLE Native', 'Bluetooth connected successfully');
           return true;
@@ -313,6 +320,12 @@ export class CapacitorBluetoothService {
     if (this.keepAliveInterval) {
       clearInterval(this.keepAliveInterval);
       this.keepAliveInterval = null;
+    }
+    
+    // Stop polling
+    if (this.pollInterval) {
+      clearInterval(this.pollInterval);
+      this.pollInterval = null;
     }
     
     if (this.deviceId) {
@@ -378,10 +391,10 @@ export class CapacitorBluetoothService {
 
       logService.info('BLE-RX', `UDS: DST=0x${dst.toString(16).toUpperCase()} SRC=0x${src.toString(16).toUpperCase()} service=0x${service.toString(16).toUpperCase()}`);
 
-      // Firmware sends response with DST=0xF1, SRC=0x28
+      // Firmware sends response with DST=0xF1, SRC=0x2A (firmware lines 1156-1157)
       // Verify this is a response meant for us
-      if (dst !== 0xF1 || src !== 0x28) {
-        logService.warn('BLE-RX', `Unexpected addresses DST=0x${dst.toString(16).toUpperCase()} SRC=0x${src.toString(16).toUpperCase()}, expected DST=0xF1 SRC=0x28`);
+      if (dst !== 0xF1 || src !== 0x2A) {
+        logService.warn('BLE-RX', `Unexpected addresses DST=0x${dst.toString(16).toUpperCase()} SRC=0x${src.toString(16).toUpperCase()}, expected DST=0xF1 SRC=0x2A`);
       }
 
       // Parse ReadDataByLocalIdentifier response (0x61 = positive response to 0x21)
@@ -478,6 +491,28 @@ export class CapacitorBluetoothService {
         logService.error('BLE-TX', 'TesterPresent failed');
       }
     }, 1500);
+  }
+
+  /**
+   * Start auto-polling diagnostic data every 2 seconds
+   */
+  private startDataPolling(): void {
+    if (this.pollInterval) {
+      clearInterval(this.pollInterval);
+    }
+    
+    // Request data immediately
+    this.requestDiagnosticData().catch(e => 
+      logService.error('BLE-TX', 'Initial diagnostic request failed')
+    );
+    
+    this.pollInterval = setInterval(async () => {
+      try {
+        await this.requestDiagnosticData();
+      } catch (e) {
+        logService.error('BLE-TX', 'Diagnostic polling failed');
+      }
+    }, 2000);
   }
 
   async sendCommand(screen: number, commandData: Uint8Array): Promise<void> {

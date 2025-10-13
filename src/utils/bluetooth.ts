@@ -19,9 +19,9 @@ export class PantsirBluetoothService {
   private readonly UART_TX_CHAR_UUID = '6e400002-b5a3-f393-e0a9-e50e24dcca9e';
   private readonly UART_RX_CHAR_UUID = '6e400003-b5a3-f393-e0a9-e50e24dcca9e';
   
-  // UDS protocol addresses (from firmware pprpzu_45k22_Blt_Pancir-7.c)
-  private readonly BSKU_ADDRESS = 0x28;  // ECU address (DST in request)
-  private readonly TESTER_ADDRESS = 0xF0; // Tester address (SRC in request)
+  // UDS protocol addresses (from firmware pprpzu_45k22_Blt_Pancir-7.c lines 1156-1157, 640, 715)
+  private readonly BSKU_ADDRESS = 0x2A;  // ECU address (DST in request, SRC in response)
+  private readonly TESTER_ADDRESS = 0xF1; // Tester address (SRC in request, DST in response)
   
   async connect(systemType: 'SKA' | 'SKE' = 'SKA'): Promise<boolean> {
     try {
@@ -83,6 +83,9 @@ export class PantsirBluetoothService {
       // Start keep-alive TesterPresent
       this.startKeepAlive();
       
+      // Start auto-polling diagnostic data every 2 seconds
+      this.startDataPolling();
+      
       return true;
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
@@ -97,6 +100,12 @@ export class PantsirBluetoothService {
     if (this.keepAliveInterval) {
       clearInterval(this.keepAliveInterval);
       this.keepAliveInterval = null;
+    }
+    
+    // Stop polling
+    if (this.pollInterval) {
+      clearInterval(this.pollInterval);
+      this.pollInterval = null;
     }
     
     if (this.characteristic) {
@@ -171,10 +180,10 @@ export class PantsirBluetoothService {
 
       logService.info('BLE-RX', `UDS: DST=0x${dst.toString(16).toUpperCase()} SRC=0x${src.toString(16).toUpperCase()} service=0x${service.toString(16).toUpperCase()}`);
 
-      // Firmware sends response with DST=0xF1, SRC=0x28
+      // Firmware sends response with DST=0xF1, SRC=0x2A (firmware lines 1156-1157)
       // Verify this is a response meant for us
-      if (dst !== 0xF1 || src !== 0x28) {
-        logService.warn('BLE-RX', `Unexpected addresses DST=0x${dst.toString(16).toUpperCase()} SRC=0x${src.toString(16).toUpperCase()}, expected DST=0xF1 SRC=0x28`);
+      if (dst !== 0xF1 || src !== 0x2A) {
+        logService.warn('BLE-RX', `Unexpected addresses DST=0x${dst.toString(16).toUpperCase()} SRC=0x${src.toString(16).toUpperCase()}, expected DST=0xF1 SRC=0x2A`);
       }
 
       // Parse ReadDataByLocalIdentifier response (0x61 = positive response to 0x21)
@@ -244,6 +253,28 @@ export class PantsirBluetoothService {
         logService.error('BLE-TX', 'TesterPresent failed');
       }
     }, 1500);
+  }
+
+  /**
+   * Start auto-polling diagnostic data every 2 seconds
+   */
+  private startDataPolling(): void {
+    if (this.pollInterval) {
+      clearInterval(this.pollInterval);
+    }
+    
+    // Request data immediately
+    this.requestDiagnosticData().catch(e => 
+      logService.error('BLE-TX', 'Initial diagnostic request failed')
+    );
+    
+    this.pollInterval = setInterval(async () => {
+      try {
+        await this.requestDiagnosticData();
+      } catch (e) {
+        logService.error('BLE-TX', 'Diagnostic polling failed');
+      }
+    }, 2000);
   }
 
   async sendCommand(screen: number, commandData: Uint8Array): Promise<void> {
