@@ -10,6 +10,8 @@ export class PantsirBluetoothService {
   private latestData: DiagnosticData | null = null;
   private systemType: 'SKA' | 'SKE' = 'SKA';
   private keepAliveInterval: any = null;
+  private pollInterval: any = null;
+  private lastRxAt: number = 0;
   private rxBuffer: number[] = [];
   
   // UART Service UUID (Nordic UART Service)
