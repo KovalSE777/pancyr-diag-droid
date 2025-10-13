@@ -77,6 +77,22 @@ export interface DiagnosticData {
   signal_SVD: boolean;     // Signal from photodiode (1st signal)
   signal_ContactNorm: boolean;  // Contact normal signal (2nd signal)
   
+  // Cycle counters (from screen 4 protocol)
+  cikl_COM: number;        // BT cycle counter
+  cikl_K_line: number;     // K-Line cycle counter
+  
+  // PWM parameters (from screen 4 protocol)
+  s1_TMR2: number;         // High level duration
+  s0_TMR2: number;         // Low level duration
+  
+  // Set voltage drops (reference values)
+  edlt_cnd_i: number;      // Set condenser voltage drop
+  edlt_isp_i: number;      // Set evaporator voltage drop
+  edlt_cmp_i: number;      // Set compressor voltage drop
+  
+  // Timer
+  timer_off: number;       // Shutdown timer
+  
   // System type
   systemType: 'SKA' | 'SKE';  // СКА or СКЭ
   

@@ -331,6 +331,16 @@ export class BluetoothDataParser {
       signal_SVD: !obr_COMP,          // Assume SVD signal present if compressor circuit OK
       signal_ContactNorm: !obr_COMP,  // Assume contact normal if compressor circuit OK
       
+      // New protocol fields (defaults for old parser)
+      cikl_COM: 0,
+      cikl_K_line: 0,
+      s1_TMR2: 0,
+      s0_TMR2: 0,
+      edlt_cnd_i: 0,
+      edlt_isp_i: 0,
+      edlt_cmp_i: 0,
+      timer_off: 0,
+      
       // Тип системы
       systemType,
 
