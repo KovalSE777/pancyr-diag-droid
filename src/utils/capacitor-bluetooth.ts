@@ -88,9 +88,9 @@ export class CapacitorBluetoothService {
       if (!this.deviceAddress) return;
       
       try {
-        const result = await BluetoothSerial.read();
-        if (result.data) {
-          const bytes = this.hexToBytes(result.data);
+        const result = await BluetoothSerial.read({ address: this.deviceAddress });
+        if (result.value) {
+          const bytes = this.hexToBytes(result.value);
           logService.info('BT-RX', `${bytes.length}b: ${toHex(bytes)}`);
           this.parser.addData(bytes);
           
@@ -167,7 +167,7 @@ export class CapacitorBluetoothService {
   private async sendASCII(text: string): Promise<void> {
     if (!this.deviceAddress) throw new Error('Not connected');
     const bytes = new TextEncoder().encode(text);
-    await BluetoothSerial.write({ value: this.bytesToHex(bytes) });
+    await BluetoothSerial.write({ address: this.deviceAddress, value: this.bytesToHex(bytes) });
   }
 
   private async sendUDSCommand(serviceData: number[]): Promise<void> {
@@ -177,7 +177,7 @@ export class CapacitorBluetoothService {
     const packet = [hdr, this.BSKU_ADDRESS, this.TESTER_ADDRESS, ...serviceData];
     const fullPacket = appendChecksum(packet);
     logService.info('BT-TX', `UDS: ${toHex(fullPacket)}`);
-    await BluetoothSerial.write({ value: this.bytesToHex(fullPacket) });
+    await BluetoothSerial.write({ address: this.deviceAddress, value: this.bytesToHex(fullPacket) });
   }
 
   private async sendStartCommunication(): Promise<void> {

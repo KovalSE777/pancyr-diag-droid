@@ -8,8 +8,7 @@ import { capacitorBluetoothService } from "@/utils/capacitor-bluetooth";
 import { useToast } from "@/hooks/use-toast";
 import bluetoothIcon from "@/assets/bluetooth-icon.png";
 import { Capacitor } from "@capacitor/core";
-
-import { BleClient } from '@capacitor-community/bluetooth-le';
+import { BluetoothSerial } from '@e-is/capacitor-bluetooth-serial';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 const BluetoothConnect = () => {
   const navigate = useNavigate();
@@ -76,20 +75,14 @@ const BluetoothConnect = () => {
     try {
       setIsScanning(true);
       setDevices([]);
-      await BleClient.initialize();
-      await BleClient.requestLEScan({}, (result) => {
-        setDevices((prev) => {
-          if (prev.find((d) => d.deviceId === result.device.deviceId)) return prev;
-          return [
-            ...prev,
-            { deviceId: result.device.deviceId, name: result.device.name, rssi: result.rssi },
-          ];
-        });
-      });
-      setTimeout(async () => {
-        try { await BleClient.stopLEScan(); } catch {}
-        setIsScanning(false);
-      }, 8000);
+      const result = await BluetoothSerial.scan();
+      const discoveredDevices = result.devices || [];
+      setDevices(discoveredDevices.map(d => ({
+        deviceId: d.address,
+        name: d.name,
+        rssi: undefined
+      })));
+      setIsScanning(false);
     } catch (e) {
       console.error('Scan error:', e);
       setIsScanning(false);
@@ -98,7 +91,6 @@ const BluetoothConnect = () => {
   };
 
   const stopScan = async () => {
-    try { await BleClient.stopLEScan(); } catch {}
     setIsScanning(false);
   };
 
