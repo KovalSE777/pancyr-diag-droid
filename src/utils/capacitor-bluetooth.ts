@@ -118,10 +118,19 @@ export class CapacitorBluetoothService {
                 break;
               }
             }
-            // HM-10 (FFE0/FFE1)
+            // HM-10 (FFE0/FFE1/FFE2)
             if (this.isUuid(su, 'ffe0')) {
               const ffe1 = s.characteristics?.find(c => this.isUuid(c.uuid, 'ffe1'));
-              if (ffe1) {
+              const ffe2 = s.characteristics?.find(c => this.isUuid(c.uuid, 'ffe2'));
+              if (ffe1 && ffe2) {
+                // FFE1: READ+NOTIFY (RX), FFE2: WRITE (TX)
+                profile = 'HM10';
+                rxChar = this.to128('ffe1');
+                txChar = this.to128('ffe2');
+                svcUuid = this.to128('ffe0');
+                break;
+              } else if (ffe1) {
+                // Fallback: single char FFE1 (some HM-10 variants)
                 profile = 'HM10';
                 rxChar = this.to128('ffe1');
                 txChar = this.to128('ffe1');
@@ -204,10 +213,19 @@ export class CapacitorBluetoothService {
             break;
           }
         }
-        // HM-10 (FFE0/FFE1)
+        // HM-10 (FFE0/FFE1/FFE2)
         if (this.isUuid(su, 'ffe0')) {
           const ffe1 = s.characteristics?.find(c => this.isUuid(c.uuid, 'ffe1'));
-          if (ffe1) {
+          const ffe2 = s.characteristics?.find(c => this.isUuid(c.uuid, 'ffe2'));
+          if (ffe1 && ffe2) {
+            // FFE1: READ+NOTIFY (RX), FFE2: WRITE (TX)
+            profile = 'HM10';
+            rxChar = this.to128('ffe1');
+            txChar = this.to128('ffe2');
+            svcUuid = this.to128('ffe0');
+            break;
+          } else if (ffe1) {
+            // Fallback: single char FFE1 (some HM-10 variants)
             profile = 'HM10';
             rxChar = this.to128('ffe1');
             txChar = this.to128('ffe1');
