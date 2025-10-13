@@ -92,27 +92,41 @@ const Diagnostics = () => {
       // Use mock data with correct system type
       setData(service.getMockData(systemType));
       setIsLive(false);
-    } else {
-      // Request real data from Bluetooth
-      service.requestDiagnosticData().then(() => {
-        // Ждем получения данных
+      return;
+    }
+
+    // Request real data from Bluetooth immediately
+    const fetchData = async () => {
+      try {
+        await service.requestDiagnosticData();
+        // Wait a bit for data to arrive
         setTimeout(() => {
           const liveData = service.getLatestData();
           if (liveData) {
+            console.log('✅ Got live data:', liveData);
             setData(liveData);
             setIsLive(true);
           } else {
-            // Если данные не пришли, используем mock
-            setData(service.getMockData(systemType));
-            setIsLive(false);
+            console.warn('⚠️ No live data received yet');
           }
-        }, 1000);
-      }).catch(error => {
+        }, 2000); // Увеличил таймаут до 2 секунд
+      } catch (error) {
         console.error('Failed to request diagnostic data:', error);
-        setData(service.getMockData(systemType));
-        setIsLive(false);
-      });
-    }
+        toast({
+          title: "Ошибка запроса данных",
+          description: "Не удалось получить данные с устройства",
+          variant: "destructive"
+        });
+      }
+    };
+
+    // Initial fetch
+    fetchData();
+
+    // Poll data every 3 seconds
+    const interval = setInterval(fetchData, 3000);
+
+    return () => clearInterval(interval);
   }, [useMock, systemType]);
 
   if (!data) {
