@@ -27,8 +27,8 @@ export interface UDSFrame {
   type: 'UDS';
   dst: number;
   src: number;
-  service: number;
-  data: Uint8Array;
+  sid: number;  // Service ID (SID)
+  data: number[];  // Raw data bytes
 }
 
 export type ParsedFrame = Frame0x88 | Frame0x66 | Frame0x77 | UDSFrame | null;
@@ -183,8 +183,12 @@ export class ProtocolParser {
 
   /**
    * Парсит UDS кадр
-   * Формат: [HDR] [DST] [SRC] [SERVICE] [DATA...] [CHK]
+   * Формат: [HDR] [DST] [SRC] [SID] [DATA...] [CHK]
    * HDR = 0x80 | (N-2), где N = количество байт от DST до последнего байта данных
+   * 
+   * ВАЖНО: Ответы от блока приходят с DST=0xF1, SRC=0x28 (согласно "изменения.docx")
+   * Отправляем: DST=0x28, SRC=0xF0
+   * Получаем: DST=0xF1, SRC=0x28
    */
   private parseUDS(): UDSFrame | null {
     if (this.buffer.length < 4) return null;
@@ -208,16 +212,16 @@ export class ProtocolParser {
 
     const dst = packet[1];
     const src = packet[2];
-    const service = packet[3];
-    const data = new Uint8Array(packet.slice(4, totalLen - 1));
+    const sid = packet[3];
+    const data = Array.from(packet.slice(4, totalLen - 1));
 
-    logService.success('PROTO', `UDS frame parsed: DST=0x${dst.toString(16).toUpperCase()} SRC=0x${src.toString(16).toUpperCase()} SVC=0x${service.toString(16).toUpperCase()}`);
+    logService.success('PROTO', `UDS frame: DST=0x${dst.toString(16).toUpperCase()} SRC=0x${src.toString(16).toUpperCase()} SID=0x${sid.toString(16).toUpperCase()}, CHK OK`);
 
     return {
       type: 'UDS',
       dst,
       src,
-      service,
+      sid,
       data
     };
   }

@@ -1,4 +1,4 @@
-import { BleClient } from '@capacitor-community/bluetooth-le';
+import { BluetoothSerial } from '@e-is/capacitor-bluetooth-serial';
 import { DiagnosticData } from '@/types/bluetooth';
 import { ProtocolParser, Frame0x88, Frame0x66, Frame0x77 } from './protocol-parser';
 import { Screen4Parser } from './screen4-parser';
@@ -6,239 +6,114 @@ import { appendChecksum, toHex } from './checksum';
 import { logService } from './log-service';
 
 export class CapacitorBluetoothService {
-  private deviceId: string | null = null;
+  private deviceAddress: string | null = null;
   private latestData: DiagnosticData | null = null;
   private systemType: 'SKA' | 'SKE' = 'SKA';
   private parser: ProtocolParser = new ProtocolParser();
+  private testerPresentInterval: number | null = null;
+  private connectionEstablished: boolean = false;
+  private readInterval: number | null = null;
   
-  // UART profiles
-  private UART_SERVICE_UUID = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
-  private UART_TX_CHAR_UUID = '6e400002-b5a3-f393-e0a9-e50e24dcca9e';
-  private UART_RX_CHAR_UUID = '6e400003-b5a3-f393-e0a9-e50e24dcca9e';
-  
-  private readonly HM10_SERVICE_UUID = '0000ffe0-0000-1000-8000-00805f9b34fb';
-  private readonly HM10_DATA_CHAR_UUID = '0000ffe1-0000-1000-8000-00805f9b34fb';
-
-  // UDS protocol addresses (опциональные)
   private readonly BSKU_ADDRESS = 0x28;
   private readonly TESTER_ADDRESS = 0xF0;
+  private readonly EXPECTED_DST = 0xF1;
+  private readonly EXPECTED_SRC = 0x28;
   
   async initialize(): Promise<void> {
     try {
-      await BleClient.initialize();
+      const result = await BluetoothSerial.isEnabled();
+      if (!result.enabled) {
+        await BluetoothSerial.enable();
+      }
+      logService.success('BT Serial', 'Bluetooth enabled');
     } catch (error) {
-      console.error('BLE initialization failed:', error);
+      console.error('BT Serial initialization failed:', error);
       throw error;
     }
   }
 
-  private to128(uuid: string): string {
-    if (!uuid) return uuid as string;
-    const u = uuid.toLowerCase();
-    if (u.includes('-')) return u;
-    const short = u.replace(/^0x/, '').padStart(4, '0');
-    return `0000${short}-0000-1000-8000-00805f9b34fb`;
-  }
-
-  private isUuid(a: string, b: string): boolean {
-    return this.to128(a) === this.to128(b);
-  }
-  
   async connect(systemType: 'SKA' | 'SKE' = 'SKA'): Promise<boolean> {
     try {
       this.systemType = systemType;
-      logService.info('BLE Native', `Starting connection for system type: ${systemType}`);
-      
       await this.initialize();
       
-      const devices: Array<{deviceId: string, name?: string, rssi?: number}> = [];
-      
-      await BleClient.requestLEScan({}, (result) => {
-        const exists = devices.find(d => d.deviceId === result.device.deviceId);
-        if (!exists) {
-          devices.push({
-            deviceId: result.device.deviceId,
-            name: result.device.name,
-            rssi: result.rssi
-          });
-        }
-      });
-      
-      await new Promise(resolve => setTimeout(resolve, 5000));
-      await BleClient.stopLEScan();
+      const result = await BluetoothSerial.scan();
+      const devices = result.devices || [];
       
       if (devices.length === 0) {
-        throw new Error('Устройства не найдены');
+        throw new Error('Нет доступных Bluetooth устройств');
       }
       
-      const bleDevices = [...devices].sort((a, b) => (b.rssi ?? -999) - (a.rssi ?? -999));
-      
-      for (const candidate of bleDevices) {
+      for (const device of devices) {
         try {
-          await BleClient.connect(candidate.deviceId, () => {
-            if (this.deviceId === candidate.deviceId) this.deviceId = null;
-          });
-
-          const services = await BleClient.getServices(candidate.deviceId);
-          let profile: 'NUS' | 'HM10' | null = null;
-          let rxChar: string | null = null;
-          let txChar: string | null = null;
-          let svcUuid: string | null = null;
-
-          for (const s of services) {
-            const su = s.uuid.toLowerCase();
-            if (this.isUuid(su, '6e400001-b5a3-f393-e0a9-e50e24dcca9e')) {
-              const rx = s.characteristics?.find(c => this.isUuid(c.uuid, '6e400003-b5a3-f393-e0a9-e50e24dcca9e'));
-              const tx = s.characteristics?.find(c => this.isUuid(c.uuid, '6e400002-b5a3-f393-e0a9-e50e24dcca9e'));
-              if (rx && tx) {
-                profile = 'NUS';
-                rxChar = this.to128('6e400003-b5a3-f393-e0a9-e50e24dcca9e');
-                txChar = this.to128('6e400002-b5a3-f393-e0a9-e50e24dcca9e');
-                svcUuid = this.to128('6e400001-b5a3-f393-e0a9-e50e24dcca9e');
-                break;
-              }
-            }
-            if (this.isUuid(su, 'ffe0')) {
-              const chars = s.characteristics || [];
-              const ffe1 = chars.find((c: any) => this.isUuid(c.uuid, 'ffe1')) as any;
-              const ffe2 = chars.find((c: any) => this.isUuid(c.uuid, 'ffe2')) as any;
-              let rx = [ffe1, ffe2].find((c: any) => c && c.properties?.notify) || null;
-              let tx = [ffe1, ffe2].find((c: any) => c && (c.properties?.write || c.properties?.writeWithoutResponse) && c !== rx) || rx;
-              if (rx) {
-                profile = 'HM10';
-                rxChar = this.to128((rx as any).uuid);
-                txChar = this.to128(((tx as any)?.uuid) || (rx as any).uuid);
-                svcUuid = this.to128('ffe0');
-                break;
-              }
-              if (ffe1) {
-                profile = 'HM10';
-                rxChar = this.to128('ffe1');
-                txChar = this.to128('ffe1');
-                svcUuid = this.to128('ffe0');
-                break;
-              }
-            }
-          }
-
-          if (profile) {
-            this.deviceId = candidate.deviceId;
-            this.UART_SERVICE_UUID = svcUuid!;
-            this.UART_RX_CHAR_UUID = rxChar!;
-            this.UART_TX_CHAR_UUID = txChar!;
-            logService.success('BLE Native', `Profile: ${profile}`);
-
-            await BleClient.startNotifications(
-              this.deviceId,
-              this.UART_SERVICE_UUID,
-              this.UART_RX_CHAR_UUID,
-              (value) => this.handleDataReceived(value)
-            );
-
-            logService.success('BLE Native', 'Connected, waiting for 0x88 frames...');
-            return true;
-          }
-
-          await BleClient.disconnect(candidate.deviceId).catch(() => {});
-        } catch (e) {
-          try { await BleClient.disconnect(candidate.deviceId); } catch {}
+          const success = await this.connectToDeviceId(device.address, systemType);
+          if (success) return true;
+        } catch (err) {
+          continue;
         }
       }
-
-      throw new Error('Подходящий BLE UART сервис не найден');
+      
+      throw new Error('Не удалось подключиться');
     } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : String(error);
-      logService.error('BLE Native', `Connection failed: ${errorMsg}`);
+      logService.error('BT Serial', `Connection failed: ${error}`);
       return false;
     }
   }
 
-  async connectToDeviceId(deviceId: string, systemType: 'SKA' | 'SKE' = 'SKA'): Promise<boolean> {
+  async connectToDeviceId(deviceAddress: string, systemType: 'SKA' | 'SKE' = 'SKA'): Promise<boolean> {
     try {
       this.systemType = systemType;
-      logService.info('BLE Native', `Connecting to device: ${deviceId}`);
-      
       await this.initialize();
-
-      await BleClient.connect(deviceId, () => {
-        if (this.deviceId === deviceId) this.deviceId = null;
-      });
-
-      const services = await BleClient.getServices(deviceId);
-      let profile: 'NUS' | 'HM10' | null = null;
-      let rxChar: string | null = null;
-      let txChar: string | null = null;
-      let svcUuid: string | null = null;
-
-      for (const s of services) {
-        const su = s.uuid.toLowerCase();
-        if (this.isUuid(su, '6e400001-b5a3-f393-e0a9-e50e24dcca9e')) {
-          const rx = s.characteristics?.find(c => this.isUuid(c.uuid, '6e400003-b5a3-f393-e0a9-e50e24dcca9e'));
-          const tx = s.characteristics?.find(c => this.isUuid(c.uuid, '6e400002-b5a3-f393-e0a9-e50e24dcca9e'));
-          if (rx && tx) {
-            profile = 'NUS';
-            rxChar = this.to128('6e400003-b5a3-f393-e0a9-e50e24dcca9e');
-            txChar = this.to128('6e400002-b5a3-f393-e0a9-e50e24dcca9e');
-            svcUuid = this.to128('6e400001-b5a3-f393-e0a9-e50e24dcca9e');
-            break;
-          }
-        }
-        if (this.isUuid(su, 'ffe0')) {
-          const chars = s.characteristics || [];
-          const ffe1 = chars.find((c: any) => this.isUuid(c.uuid, 'ffe1')) as any;
-          const ffe2 = chars.find((c: any) => this.isUuid(c.uuid, 'ffe2')) as any;
-          let rx = [ffe1, ffe2].find((c: any) => c && c.properties?.notify) || null;
-          let tx = [ffe1, ffe2].find((c: any) => c && (c.properties?.write || c.properties?.writeWithoutResponse) && c !== rx) || rx;
-          if (rx) {
-            profile = 'HM10';
-            rxChar = this.to128((rx as any).uuid);
-            txChar = this.to128(((tx as any)?.uuid) || (rx as any).uuid);
-            svcUuid = this.to128('ffe0');
-            break;
-          }
-          if (ffe1) {
-            profile = 'HM10';
-            rxChar = this.to128('ffe1');
-            txChar = this.to128('ffe1');
-            svcUuid = this.to128('ffe0');
-            break;
-          }
-        }
-      }
-
-      if (profile) {
-        this.deviceId = deviceId;
-        this.UART_SERVICE_UUID = svcUuid!;
-        this.UART_RX_CHAR_UUID = rxChar!;
-        this.UART_TX_CHAR_UUID = txChar!;
-        logService.success('BLE Native', `Profile: ${profile}`);
-
-        await BleClient.startNotifications(
-          this.deviceId,
-          this.UART_SERVICE_UUID,
-          this.UART_RX_CHAR_UUID,
-          (value) => this.handleDataReceived(value)
-        );
-
-        logService.success('BLE Native', 'Connected successfully');
-        return true;
-      }
-
-      await BleClient.disconnect(deviceId).catch(() => {});
-      return false;
+      await BluetoothSerial.connect({ address: deviceAddress });
+      
+      this.deviceAddress = deviceAddress;
+      this.startReading();
+      
+      await new Promise(resolve => setTimeout(resolve, 150));
+      await this.sendStartCommunication();
+      
+      this.connectionEstablished = true;
+      this.startTesterPresent();
+      
+      logService.success('BT Serial', 'Connected');
+      return true;
     } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : String(error);
-      logService.error('BLE Native', `Connection failed: ${errorMsg}`);
-      try { await BleClient.disconnect(deviceId); } catch {}
+      logService.error('BT Serial', `Connection failed: ${error}`);
       return false;
     }
+  }
+
+  private startReading(): void {
+    this.readInterval = window.setInterval(async () => {
+      if (!this.deviceAddress) return;
+      
+      try {
+        const result = await BluetoothSerial.read();
+        if (result.data) {
+          const bytes = this.hexToBytes(result.data);
+          logService.info('BT-RX', `${bytes.length}b: ${toHex(bytes)}`);
+          this.parser.addData(bytes);
+          
+          let frame;
+          while ((frame = this.parser.parseNextFrame()) !== null) {
+            this.handleParsedFrame(frame);
+          }
+        }
+      } catch (err) {
+        // Нет данных
+      }
+    }, 100);
   }
 
   async disconnect(): Promise<void> {
-    if (this.deviceId) {
+    this.stopTesterPresent();
+    if (this.readInterval) clearInterval(this.readInterval);
+    
+    if (this.deviceAddress) {
       try {
-        await BleClient.disconnect(this.deviceId);
-        this.deviceId = null;
+        await BluetoothSerial.disconnect({ address: this.deviceAddress });
+        this.deviceAddress = null;
+        this.connectionEstablished = false;
         this.parser.clearBuffer();
       } catch (error) {
         console.error('Disconnect failed:', error);
@@ -247,19 +122,20 @@ export class CapacitorBluetoothService {
   }
   
   isConnected(): boolean {
-    return this.deviceId !== null;
+    return this.deviceAddress !== null && this.connectionEstablished;
   }
-  
-  private handleDataReceived(value: DataView): void {
-    const chunk = new Uint8Array(value.buffer);
-    logService.info('BLE-RX', `chunk ${chunk.length}b: ${toHex(chunk)}`);
 
-    this.parser.addData(chunk);
-
-    let frame;
-    while ((frame = this.parser.parseNextFrame()) !== null) {
-      this.handleParsedFrame(frame);
+  private hexToBytes(hex: string): Uint8Array {
+    const cleaned = hex.replace(/\s/g, '');
+    const bytes = new Uint8Array(cleaned.length / 2);
+    for (let i = 0; i < cleaned.length; i += 2) {
+      bytes[i / 2] = parseInt(cleaned.substr(i, 2), 16);
     }
+    return bytes;
+  }
+
+  private bytesToHex(bytes: Uint8Array | number[]): string {
+    return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
   }
 
   private handleParsedFrame(frame: any): void {
@@ -269,7 +145,7 @@ export class CapacitorBluetoothService {
         const diagnosticData = Screen4Parser.parse(f.payload, this.systemType);
         if (diagnosticData) {
           this.latestData = diagnosticData;
-          logService.success('BLE-RX', 'Screen 4 parsed');
+          logService.success('BT-RX', 'Screen 4 parsed');
         }
       }
     }
@@ -282,40 +158,47 @@ export class CapacitorBluetoothService {
       this.sendASCII(`UOKP${String.fromCharCode(f.packageNum)}`).catch(() => {});
     }
     else if (frame.type === 'UDS') {
-      if (frame.dst === 0xF1 && frame.src === 0x28) {
-        logService.success('BLE-RX', 'UDS response');
+      if (frame.dst === this.EXPECTED_DST && frame.src === this.EXPECTED_SRC) {
+        logService.success('BT-RX', `UDS: SID=0x${frame.sid.toString(16).toUpperCase()}`);
       }
     }
   }
 
   private async sendASCII(text: string): Promise<void> {
-    if (!this.deviceId) throw new Error('Not connected');
-    
+    if (!this.deviceAddress) throw new Error('Not connected');
     const bytes = new TextEncoder().encode(text);
-    const dataView = new DataView(bytes.buffer);
-    
-    try {
-      await BleClient.write(this.deviceId, this.UART_SERVICE_UUID, this.UART_TX_CHAR_UUID, dataView);
-    } catch {
-      await BleClient.writeWithoutResponse(this.deviceId, this.UART_SERVICE_UUID, this.UART_TX_CHAR_UUID, dataView);
-    }
+    await BluetoothSerial.write({ value: this.bytesToHex(bytes) });
   }
 
   private async sendUDSCommand(serviceData: number[]): Promise<void> {
-    if (!this.deviceId) throw new Error('Not connected');
-    
+    if (!this.deviceAddress) throw new Error('Not connected');
     const N = serviceData.length + 2;
     const hdr = 0x80 | ((N - 2) & 0x3F);
     const packet = [hdr, this.BSKU_ADDRESS, this.TESTER_ADDRESS, ...serviceData];
     const fullPacket = appendChecksum(packet);
-    const data = new Uint8Array(fullPacket);
-    const dataView = new DataView(data.buffer);
-    
-    try {
-      await BleClient.write(this.deviceId, this.UART_SERVICE_UUID, this.UART_TX_CHAR_UUID, dataView);
-    } catch {
-      await BleClient.writeWithoutResponse(this.deviceId, this.UART_SERVICE_UUID, this.UART_TX_CHAR_UUID, dataView);
-    }
+    logService.info('BT-TX', `UDS: ${toHex(fullPacket)}`);
+    await BluetoothSerial.write({ value: this.bytesToHex(fullPacket) });
+  }
+
+  private async sendStartCommunication(): Promise<void> {
+    await this.sendUDSCommand([0x81]);
+  }
+
+  private async sendTesterPresent(): Promise<void> {
+    await this.sendUDSCommand([0x3E, 0x01]);
+  }
+
+  private startTesterPresent(): void {
+    this.stopTesterPresent();
+    this.testerPresentInterval = window.setInterval(() => {
+      if (this.isConnected()) {
+        this.sendTesterPresent().catch(() => {});
+      }
+    }, 1500);
+  }
+
+  private stopTesterPresent(): void {
+    if (this.testerPresentInterval) clearInterval(this.testerPresentInterval);
   }
 
   getLatestData(): DiagnosticData | null {
@@ -327,11 +210,11 @@ export class CapacitorBluetoothService {
   }
 
   async setTestMode(enabled: boolean): Promise<void> {
-    logService.warn('BLE-TX', 'setTestMode not implemented');
+    logService.warn('BT-TX', 'setTestMode not implemented yet');
   }
 
   async controlRelays(relays: any): Promise<void> {
-    logService.warn('BLE-TX', 'controlRelays not implemented');
+    logService.warn('BT-TX', 'controlRelays not implemented yet');
   }
 
   getMockData(systemType: string = 'SKA'): DiagnosticData {
@@ -345,8 +228,7 @@ export class CapacitorBluetoothService {
       n_V_cnd: isSKE ? 2 : 1, n_V_isp: 1, n_V_cmp: 1,
       PWM_spd: 2,
       condenserFans: isSKE ? [
-        { id: 1, status: 'ok' },
-        { id: 2, status: 'ok' },
+        { id: 1, status: 'ok' }, { id: 2, status: 'ok' },
         { id: 3, status: 'error', errorMessage: 'Вентилятор конденсатора #3 не работает', repairHint: 'Проверьте питание' }
       ] : [
         { id: 1, status: 'ok' },
