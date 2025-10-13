@@ -7,6 +7,7 @@ export class CapacitorBluetoothService {
   private deviceId: string | null = null;
   private latestData: DiagnosticData | null = null;
   private systemType: 'SKA' | 'SKE' = 'SKA';
+  private keepAliveInterval: any = null;
   
   // UART profiles (defaults to Nordic NUS; will auto-detect HM-10 too)
   private UART_SERVICE_UUID = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
@@ -15,6 +16,10 @@ export class CapacitorBluetoothService {
   // HM-10 (FFE0/FFE1)
   private readonly HM10_SERVICE_UUID = '0000ffe0-0000-1000-8000-00805f9b34fb';
   private readonly HM10_DATA_CHAR_UUID = '0000ffe1-0000-1000-8000-00805f9b34fb';
+
+  // UDS protocol addresses
+  private readonly BSKU_ADDRESS = 0x2A;
+  private readonly TESTER_ADDRESS = 0xF1;
 
   // RX packet assembly buffer and helpers
   private rxBuffer: number[] = [];
@@ -175,6 +180,12 @@ export class CapacitorBluetoothService {
             );
             logService.success('BLE Native', `notifications started: svc=${this.UART_SERVICE_UUID} rx=${this.UART_RX_CHAR_UUID}`);
 
+            // Send StartCommunication command
+            await this.sendStartCommunication();
+            
+            // Start keep-alive TesterPresent
+            this.startKeepAlive();
+
             logService.success('BLE Native', 'Bluetooth connected successfully');
             return true;
           }
@@ -272,11 +283,18 @@ export class CapacitorBluetoothService {
           this.deviceId,
           this.UART_SERVICE_UUID,
           this.UART_RX_CHAR_UUID,
-          (value) => this.handleDataReceived(value)
-        );
+            (value) => this.handleDataReceived(value)
+          );
+          logService.success('BLE Native', `notifications started: svc=${this.UART_SERVICE_UUID} rx=${this.UART_RX_CHAR_UUID}`);
 
-        logService.success('BLE Native', 'Bluetooth connected successfully');
-        return true;
+          // Send StartCommunication command
+          await this.sendStartCommunication();
+          
+          // Start keep-alive TesterPresent
+          this.startKeepAlive();
+
+          logService.success('BLE Native', 'Bluetooth connected successfully');
+          return true;
       }
 
       await BleClient.disconnect(deviceId).catch(() => {});
@@ -291,10 +309,17 @@ export class CapacitorBluetoothService {
   }
 
   async disconnect(): Promise<void> {
+    // Stop keep-alive
+    if (this.keepAliveInterval) {
+      clearInterval(this.keepAliveInterval);
+      this.keepAliveInterval = null;
+    }
+    
     if (this.deviceId) {
       try {
         await BleClient.disconnect(this.deviceId);
         this.deviceId = null;
+        logService.info('BLE Native', 'Disconnected');
       } catch (error) {
         console.error('Disconnect failed:', error);
       }
@@ -309,19 +334,24 @@ export class CapacitorBluetoothService {
     const chunk = new Uint8Array(value.buffer);
     logService.info('BLE-RX', `chunk ${chunk.length}b: ${this.toHex(chunk)}`);
 
-    // Append chunk to buffer and try to assemble full packets
+    // Append chunk to buffer and try to assemble full UDS packets
     this.rxBuffer.push(...Array.from(chunk));
 
     while (this.rxBuffer.length >= 4) {
-      // Resync to header 0x88
-      if (this.rxBuffer[0] !== 0x88) {
+      // UDS packet: [LEN] [DST] [SRC] [service+data...] [checksum]
+      // LEN byte: 0x80 | (N-2), where N = number of bytes from DST to last data byte before checksum
+      
+      const lenByte = this.rxBuffer[0];
+      
+      // Check if valid UDS length byte (bit 7 must be set)
+      if ((lenByte & 0x80) === 0) {
         const dropped = this.rxBuffer.shift()!;
-        logService.warn('BLE-RX', `desync: drop 0x${dropped.toString(16).toUpperCase()}`);
+        logService.warn('BLE-RX', `desync: drop 0x${dropped.toString(16).toUpperCase()} (not UDS len)`);
         continue;
       }
 
-      const length = this.rxBuffer[2];
-      const totalLen = 4 + length; // header(1)+screen(1)+len(1)+data(len)+checksum(1)
+      const dataLen = (lenByte & 0x3F) + 2; // N = (LEN & 0x3F) + 2
+      const totalLen = dataLen + 2; // LEN byte + DST...data bytes + checksum
 
       if (this.rxBuffer.length < totalLen) {
         // Wait for more data
@@ -331,62 +361,66 @@ export class CapacitorBluetoothService {
       const packet = this.rxBuffer.slice(0, totalLen);
       this.rxBuffer = this.rxBuffer.slice(totalLen);
 
+      // Verify checksum: sum of all bytes except last one
       const calc = packet.slice(0, totalLen - 1).reduce((sum, b) => (sum + b) & 0xff, 0);
       const recv = packet[totalLen - 1];
 
-      logService.info('BLE-RX', `packet ${totalLen}b: ${this.toHex(packet)} | len=${length} sum(calc)=0x${calc.toString(16).toUpperCase()} sum(recv)=0x${recv.toString(16).toUpperCase()}`);
+      logService.info('BLE-RX', `UDS packet ${totalLen}b: ${this.toHex(packet)} | sum(calc)=0x${calc.toString(16).toUpperCase()} sum(recv)=0x${recv.toString(16).toUpperCase()}`);
 
       if (calc !== recv) {
         logService.error('BLE-RX', 'checksum mismatch, packet discarded');
         continue;
       }
 
-      const screen = packet[1];
-      const body = new Uint8Array(packet.slice(3, 3 + length));
+      const dst = packet[1];
+      const src = packet[2];
+      const service = packet[3];
 
-      if (screen === 0xF1) {
+      logService.info('BLE-RX', `UDS: DST=0x${dst.toString(16).toUpperCase()} SRC=0x${src.toString(16).toUpperCase()} service=0x${service.toString(16).toUpperCase()}`);
+
+      // Parse ReadDataByLocalIdentifier response (0x21 0x01)
+      if (service === 0x21 && packet[4] === 0x01) {
+        const body = new Uint8Array(packet.slice(5, totalLen - 1));
         const diagnosticData = BluetoothDataParser.parseData(body, this.systemType);
         if (diagnosticData) {
           this.latestData = diagnosticData;
-          logService.success('BLE-RX', 'diagnostic parsed');
+          logService.success('BLE-RX', 'diagnostic parsed from UDS');
         } else {
           logService.warn('BLE-RX', 'diagnostic parse failed');
         }
       } else {
-        logService.info('BLE-RX', `packet for screen 0x${screen.toString(16).toUpperCase()}`);
+        logService.info('BLE-RX', `UDS response service=0x${service.toString(16).toUpperCase()}`);
       }
     }
   }
   
-  async sendCommand(screen: number, commandData: Uint8Array): Promise<void> {
+  /**
+   * Send UDS-format command
+   * Format: [LEN] [DST=0x2A] [SRC=0xF1] [service+data...] [checksum]
+   * LEN = 0x80 | (N-2), where N = number of bytes from DST to last data byte
+   */
+  private async sendUDSCommand(serviceData: number[]): Promise<void> {
     if (!this.deviceId) {
       throw new Error('Not connected');
     }
     
-    // Build packet: [header, screen, length, ...data, checksum]
-    const packet = new Uint8Array(4 + commandData.length);
-    packet[0] = 0x88;
-    packet[1] = screen;
-    packet[2] = commandData.length;
-    packet.set(commandData, 3);
+    const N = serviceData.length + 2; // DST + SRC + service+data
+    const lenByte = 0x80 | ((N - 2) & 0x3F);
     
-    // Calculate checksum
-    let checksum = 0;
-    for (let i = 0; i < 3 + commandData.length; i++) {
-      checksum += packet[i];
-    }
-    packet[3 + commandData.length] = checksum & 0xFF;
+    const packet = [lenByte, this.BSKU_ADDRESS, this.TESTER_ADDRESS, ...serviceData];
     
-    const hexPacket = this.toHex(packet);
-    const hexCommand = this.toHex(commandData);
+    // Calculate checksum: sum of all bytes
+    const checksum = packet.reduce((sum, b) => (sum + b) & 0xff, 0);
+    packet.push(checksum);
     
-    logService.info('BLE-TX', `packet ${packet.length}b -> screen 0x${screen.toString(16).toUpperCase()} data=[${hexCommand}] sum=0x${(checksum & 0xFF).toString(16).toUpperCase()} svc=${this.UART_SERVICE_UUID} tx=${this.UART_TX_CHAR_UUID}`);
+    const data = new Uint8Array(packet);
+    const hexPacket = this.toHex(data);
     
-    // Convert to DataView
-    const dataView = new DataView(packet.buffer);
+    logService.info('BLE-TX', `UDS packet ${data.length}b: ${hexPacket}`);
+    
+    const dataView = new DataView(data.buffer);
     
     try {
-      // Write to TX characteristic (prefer write with response, fallback to withoutResponse)
       try {
         await BleClient.write(
           this.deviceId,
@@ -409,6 +443,39 @@ export class CapacitorBluetoothService {
       throw error;
     }
   }
+
+  /**
+   * Send StartCommunication (0x81)
+   * Packet: 83 2A F1 81 1F
+   */
+  private async sendStartCommunication(): Promise<void> {
+    logService.info('BLE-TX', 'Sending StartCommunication (0x81)');
+    await this.sendUDSCommand([0x81]);
+  }
+
+  /**
+   * Start keep-alive timer (TesterPresent every 1.5 seconds)
+   * Packet: 83 2A F1 3E 01 DD
+   */
+  private startKeepAlive(): void {
+    if (this.keepAliveInterval) {
+      clearInterval(this.keepAliveInterval);
+    }
+    
+    this.keepAliveInterval = setInterval(async () => {
+      try {
+        logService.info('BLE-TX', 'Sending TesterPresent (keep-alive)');
+        await this.sendUDSCommand([0x3E, 0x01]);
+      } catch (e) {
+        logService.error('BLE-TX', 'TesterPresent failed');
+      }
+    }, 1500);
+  }
+
+  async sendCommand(screen: number, commandData: Uint8Array): Promise<void> {
+    // Legacy method - now unused, kept for compatibility
+    throw new Error('sendCommand is deprecated, use UDS protocol methods');
+  }
   
   /**
    * Получает последние полученные диагностические данные
@@ -418,38 +485,24 @@ export class CapacitorBluetoothService {
   }
   
   /**
-   * Запрашивает диагностические данные от БСКУ
+   * Request diagnostic data (ReadDataByLocalIdentifier 0x21 0x01)
+   * Packet: 83 2A F1 21 01 C0
    */
   async requestDiagnosticData(): Promise<void> {
-    // Отправка команды запроса диагностики (экран 0xF1)
-    const commandData = new Uint8Array([0x61, 0x01]);
-    await this.sendCommand(0xF1, commandData);
+    logService.info('BLE-TX', 'Requesting diagnostic data (0x21 0x01)');
+    await this.sendUDSCommand([0x21, 0x01]);
   }
 
   /**
-   * Переключает тестовый режим (флаг fTEST через бит 0x10 в iDAT_BIT)
-   * @param enabled - включить/выключить тестовый режим
+   * Set test mode (legacy - needs UDS implementation)
    */
   async setTestMode(enabled: boolean): Promise<void> {
-    // Команда управления тестовым режимом
-    const commandData = new Uint8Array([0x62, enabled ? 0x10 : 0x00]);
-    await this.sendCommand(0xF1, commandData);
+    logService.warn('BLE-TX', 'setTestMode not yet implemented for UDS protocol');
+    // TODO: implement test mode control via UDS if supported
   }
 
   /**
-   * Управление реле в тестовом режиме
-   * @param switches - состояния переключателей (b_switch1 и b_switch2)
-   * 
-   * b_switch1 биты:
-   * - bit 0: test flag
-   * - bit 5: M1 (condenser fan 1)
-   * - bit 6: M2 (condenser fan 2)
-   * - bit 7: M3 (condenser fan 3)
-   * 
-   * b_switch2 биты:
-   * - bit 0: M4 (evaporator fan 1)
-   * - bit 1: M5 (evaporator fan 2)
-   * - bit 2: Compressor
+   * Control relays in test mode (legacy - needs UDS implementation)
    */
   async controlRelays(relays: {
     M1?: boolean;
@@ -459,21 +512,8 @@ export class CapacitorBluetoothService {
     M5?: boolean;
     CMP?: boolean;
   }): Promise<void> {
-    let b_switch1 = 0x01; // Set test bit
-    let b_switch2 = 0x00;
-
-    // Set b_switch1 bits (M1, M2, M3)
-    if (relays.M1) b_switch1 |= 0x20; // bit 5
-    if (relays.M2) b_switch1 |= 0x40; // bit 6
-    if (relays.M3) b_switch1 |= 0x80; // bit 7
-
-    // Set b_switch2 bits (M4, M5, CMP)
-    if (relays.M4) b_switch2 |= 0x01; // bit 0
-    if (relays.M5) b_switch2 |= 0x02; // bit 1
-    if (relays.CMP) b_switch2 |= 0x04; // bit 2
-
-    const commandData = new Uint8Array([0x63, b_switch1, b_switch2]);
-    await this.sendCommand(0xF1, commandData);
+    logService.warn('BLE-TX', 'controlRelays not yet implemented for UDS protocol');
+    // TODO: implement relay control via UDS if supported
   }
   
   // Mock data for testing

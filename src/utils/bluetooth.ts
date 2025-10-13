@@ -9,11 +9,17 @@ export class PantsirBluetoothService {
   private server: any = null;
   private latestData: DiagnosticData | null = null;
   private systemType: 'SKA' | 'SKE' = 'SKA';
+  private keepAliveInterval: any = null;
+  private rxBuffer: number[] = [];
   
   // UART Service UUID (Nordic UART Service)
   private readonly UART_SERVICE_UUID = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
   private readonly UART_TX_CHAR_UUID = '6e400002-b5a3-f393-e0a9-e50e24dcca9e';
   private readonly UART_RX_CHAR_UUID = '6e400003-b5a3-f393-e0a9-e50e24dcca9e';
+  
+  // UDS protocol addresses
+  private readonly BSKU_ADDRESS = 0x2A;
+  private readonly TESTER_ADDRESS = 0xF1;
   
   async connect(systemType: 'SKA' | 'SKE' = 'SKA'): Promise<boolean> {
     try {
@@ -68,6 +74,13 @@ export class PantsirBluetoothService {
       console.log('✅ [BLE] Bluetooth connected successfully');
       console.log('🔵 [BLE] TX UUID:', this.UART_TX_CHAR_UUID);
       console.log('🔵 [BLE] RX UUID:', this.UART_RX_CHAR_UUID);
+      
+      // Send StartCommunication command
+      await this.sendStartCommunication();
+      
+      // Start keep-alive TesterPresent
+      this.startKeepAlive();
+      
       return true;
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
@@ -78,6 +91,12 @@ export class PantsirBluetoothService {
   }
   
   async disconnect(): Promise<void> {
+    // Stop keep-alive
+    if (this.keepAliveInterval) {
+      clearInterval(this.keepAliveInterval);
+      this.keepAliveInterval = null;
+    }
+    
     if (this.characteristic) {
       await this.characteristic.stopNotifications();
       this.characteristic.removeEventListener('characteristicvaluechanged', 
@@ -97,90 +116,79 @@ export class PantsirBluetoothService {
     return this.device !== null && this.device.gatt !== undefined && this.device.gatt.connected;
   }
   
+  private toHex(bytes: ArrayLike<number>): string {
+    return Array.from(bytes).map(b => b.toString(16).padStart(2, '0').toUpperCase()).join(' ');
+  }
+  
   private handleDataReceived(event: Event): void {
     const target = event.target as any;
     const value = target.value;
     
     if (!value) return;
     
-    const data = new Uint8Array(value.buffer);
-    const hexData = Array.from(data).map(b => b.toString(16).padStart(2, '0').toUpperCase()).join(' ');
-    logService.info('BLE-RX', `Raw chunk (${data.length} bytes): ${hexData}`);
-    console.log('📥 [BLE] Raw data received (' + data.length + ' bytes):', hexData);
-    
-    const packet = this.parsePacket(data);
-    
-    if (packet && packet.screen === 0xF1) {
-      logService.success('BLE', 'Valid diagnostic packet parsed');
-      console.log('📦 [BLE] Valid diagnostic packet parsed');
-      // Парсим диагностические данные
-      const diagnosticData = BluetoothDataParser.parseData(packet.data, this.systemType);
-      if (diagnosticData) {
-        this.latestData = diagnosticData;
-        logService.success('BLE', 'Diagnostic data parsed successfully');
-        console.log('✅ [BLE] Diagnostic data parsed successfully:', diagnosticData);
-      } else {
-        logService.warn('BLE', 'Failed to parse diagnostic data');
-        console.warn('⚠️ [BLE] Failed to parse diagnostic data');
+    const chunk = new Uint8Array(value.buffer);
+    logService.info('BLE-RX', `chunk ${chunk.length}b: ${this.toHex(chunk)}`);
+
+    // Append chunk to buffer and try to assemble full UDS packets
+    this.rxBuffer.push(...Array.from(chunk));
+
+    while (this.rxBuffer.length >= 4) {
+      // UDS packet: [LEN] [DST] [SRC] [service+data...] [checksum]
+      const lenByte = this.rxBuffer[0];
+      
+      // Check if valid UDS length byte (bit 7 must be set)
+      if ((lenByte & 0x80) === 0) {
+        const dropped = this.rxBuffer.shift()!;
+        logService.warn('BLE-RX', `desync: drop 0x${dropped.toString(16).toUpperCase()} (not UDS len)`);
+        continue;
       }
-    } else if (!packet) {
-      logService.warn('BLE', 'Failed to parse packet');
-      console.warn('⚠️ [BLE] Failed to parse packet');
-    } else {
-      logService.info('BLE', `Packet received for screen: 0x${packet.screen.toString(16).toUpperCase()}`);
-      console.log('📦 [BLE] Packet received for screen:', '0x' + packet.screen.toString(16).toUpperCase());
+
+      const dataLen = (lenByte & 0x3F) + 2;
+      const totalLen = dataLen + 2;
+
+      if (this.rxBuffer.length < totalLen) {
+        break;
+      }
+
+      const packet = this.rxBuffer.slice(0, totalLen);
+      this.rxBuffer = this.rxBuffer.slice(totalLen);
+
+      const calc = packet.slice(0, totalLen - 1).reduce((sum, b) => (sum + b) & 0xff, 0);
+      const recv = packet[totalLen - 1];
+
+      logService.info('BLE-RX', `UDS packet ${totalLen}b: ${this.toHex(packet)} | sum(calc)=0x${calc.toString(16).toUpperCase()} sum(recv)=0x${recv.toString(16).toUpperCase()}`);
+
+      if (calc !== recv) {
+        logService.error('BLE-RX', 'checksum mismatch, packet discarded');
+        continue;
+      }
+
+      const dst = packet[1];
+      const src = packet[2];
+      const service = packet[3];
+
+      logService.info('BLE-RX', `UDS: DST=0x${dst.toString(16).toUpperCase()} SRC=0x${src.toString(16).toUpperCase()} service=0x${service.toString(16).toUpperCase()}`);
+
+      // Parse ReadDataByLocalIdentifier response (0x21 0x01)
+      if (service === 0x21 && packet[4] === 0x01) {
+        const body = new Uint8Array(packet.slice(5, totalLen - 1));
+        const diagnosticData = BluetoothDataParser.parseData(body, this.systemType);
+        if (diagnosticData) {
+          this.latestData = diagnosticData;
+          logService.success('BLE-RX', 'diagnostic parsed from UDS');
+        } else {
+          logService.warn('BLE-RX', 'diagnostic parse failed');
+        }
+      } else {
+        logService.info('BLE-RX', `UDS response service=0x${service.toString(16).toUpperCase()}`);
+      }
     }
   }
   
-  private parsePacket(data: Uint8Array): BluetoothPacket | null {
-    // Check header
-    if (data[0] !== 0x88) {
-      logService.warn('BLE', `Invalid packet header: 0x${data[0].toString(16).toUpperCase()} (expected 0x88)`);
-      console.warn('⚠️ [BLE] Invalid packet header: 0x' + data[0].toString(16).toUpperCase() + ' (expected 0x88)');
-      return null;
-    }
-    
-    const screen = data[1];
-    const length = data[2];
-    
-    console.log('📦 [BLE] Parsing packet: Header=0x' + data[0].toString(16).toUpperCase() + 
-                ', Screen=0x' + screen.toString(16).toUpperCase() + 
-                ', Length=' + length);
-    
-    // Extract data
-    const packetData = data.slice(3, 3 + length);
-    const hexPacketData = Array.from(packetData).map(b => b.toString(16).padStart(2, '0').toUpperCase()).join(' ');
-    console.log('📦 [BLE] Packet data (' + length + ' bytes):', hexPacketData);
-    
-    // Calculate checksum
-    let checksum = 0;
-    for (let i = 0; i < 3 + length; i++) {
-      checksum += data[i];
-    }
-    checksum = checksum & 0xFF;
-    
-    const receivedChecksum = data[3 + length];
-    
-    console.log('🔐 [BLE] Checksum: calculated=0x' + checksum.toString(16).toUpperCase() + 
-                ', received=0x' + receivedChecksum.toString(16).toUpperCase());
-    
-    if (checksum !== receivedChecksum) {
-      console.warn('❌ [BLE] Checksum mismatch! Packet corrupted.');
-      return null;
-    }
-    
-    console.log('✅ [BLE] Packet valid');
-    
-    return {
-      header: data[0],
-      screen,
-      length,
-      data: packetData,
-      checksum: receivedChecksum
-    };
-  }
-  
-  async sendCommand(screen: number, commandData: Uint8Array): Promise<void> {
+  /**
+   * Send UDS-format command
+   */
+  private async sendUDSCommand(serviceData: number[]): Promise<void> {
     if (!this.server || !this.characteristic) {
       throw new Error('Not connected');
     }
@@ -188,33 +196,49 @@ export class PantsirBluetoothService {
     const service = await this.server.getPrimaryService(this.UART_SERVICE_UUID);
     const txCharacteristic = await service.getCharacteristic(this.UART_TX_CHAR_UUID);
     
-    // Build packet
-    const packet = new Uint8Array(4 + commandData.length);
-    packet[0] = 0x88;
-    packet[1] = screen;
-    packet[2] = commandData.length;
-    packet.set(commandData, 3);
+    const N = serviceData.length + 2;
+    const lenByte = 0x80 | ((N - 2) & 0x3F);
     
-    // Calculate checksum
-    let checksum = 0;
-    for (let i = 0; i < 3 + commandData.length; i++) {
-      checksum += packet[i];
-    }
-    packet[3 + commandData.length] = checksum & 0xFF;
+    const packet = [lenByte, this.BSKU_ADDRESS, this.TESTER_ADDRESS, ...serviceData];
+    const checksum = packet.reduce((sum, b) => (sum + b) & 0xff, 0);
+    packet.push(checksum);
     
-    const hexPacket = Array.from(packet).map(b => b.toString(16).padStart(2, '0').toUpperCase()).join(' ');
-    const hexCommand = Array.from(commandData).map(b => b.toString(16).padStart(2, '0').toUpperCase()).join(' ');
+    const data = new Uint8Array(packet);
+    logService.info('BLE-TX', `UDS packet ${data.length}b: ${this.toHex(data)}`);
     
-    logService.info('BLE-TX', `Sending -> screen 0x${screen.toString(16).toUpperCase()}: [${hexCommand}]`);
-    console.log('📤 [BLE] Sending command:');
-    console.log('  Screen: 0x' + screen.toString(16).toUpperCase());
-    console.log('  Command data: [' + hexCommand + ']');
-    console.log('  Full packet (' + packet.length + ' bytes): [' + hexPacket + ']');
-    console.log('  Checksum: 0x' + (checksum & 0xFF).toString(16).toUpperCase());
-    
-    await txCharacteristic.writeValue(packet);
+    await txCharacteristic.writeValue(data);
     logService.success('BLE-TX', 'sent');
-    console.log('✅ [BLE] Command sent successfully');
+  }
+
+  /**
+   * Send StartCommunication (0x81)
+   */
+  private async sendStartCommunication(): Promise<void> {
+    logService.info('BLE-TX', 'Sending StartCommunication (0x81)');
+    await this.sendUDSCommand([0x81]);
+  }
+
+  /**
+   * Start keep-alive timer (TesterPresent every 1.5 seconds)
+   */
+  private startKeepAlive(): void {
+    if (this.keepAliveInterval) {
+      clearInterval(this.keepAliveInterval);
+    }
+    
+    this.keepAliveInterval = setInterval(async () => {
+      try {
+        logService.info('BLE-TX', 'Sending TesterPresent (keep-alive)');
+        await this.sendUDSCommand([0x3E, 0x01]);
+      } catch (e) {
+        logService.error('BLE-TX', 'TesterPresent failed');
+      }
+    }, 1500);
+  }
+
+  async sendCommand(screen: number, commandData: Uint8Array): Promise<void> {
+    // Legacy method - now unused
+    throw new Error('sendCommand is deprecated, use UDS protocol methods');
   }
   
   /**
@@ -225,38 +249,22 @@ export class PantsirBluetoothService {
   }
   
   /**
-   * Запрашивает диагностические данные от БСКУ
+   * Request diagnostic data (ReadDataByLocalIdentifier 0x21 0x01)
    */
   async requestDiagnosticData(): Promise<void> {
-    // Отправка команды запроса диагностики (экран 0xF1)
-    const commandData = new Uint8Array([0x61, 0x01]);
-    await this.sendCommand(0xF1, commandData);
+    logService.info('BLE-TX', 'Requesting diagnostic data (0x21 0x01)');
+    await this.sendUDSCommand([0x21, 0x01]);
   }
 
   /**
-   * Переключает тестовый режим (флаг fTEST через бит 0x10 в iDAT_BIT)
-   * @param enabled - включить/выключить тестовый режим
+   * Set test mode (legacy - needs UDS implementation)
    */
   async setTestMode(enabled: boolean): Promise<void> {
-    // Команда управления тестовым режимом
-    const commandData = new Uint8Array([0x62, enabled ? 0x10 : 0x00]);
-    await this.sendCommand(0xF1, commandData);
+    logService.warn('BLE-TX', 'setTestMode not yet implemented for UDS protocol');
   }
 
   /**
-   * Управление реле в тестовом режиме
-   * @param switches - состояния переключателей (b_switch1 и b_switch2)
-   * 
-   * b_switch1 биты:
-   * - bit 0: test flag
-   * - bit 5: M1 (condenser fan 1)
-   * - bit 6: M2 (condenser fan 2)
-   * - bit 7: M3 (condenser fan 3)
-   * 
-   * b_switch2 биты:
-   * - bit 0: M4 (evaporator fan 1)
-   * - bit 1: M5 (evaporator fan 2)
-   * - bit 2: Compressor
+   * Control relays in test mode (legacy - needs UDS implementation)
    */
   async controlRelays(relays: {
     M1?: boolean;
@@ -266,21 +274,7 @@ export class PantsirBluetoothService {
     M5?: boolean;
     CMP?: boolean;
   }): Promise<void> {
-    let b_switch1 = 0x01; // Set test bit
-    let b_switch2 = 0x00;
-
-    // Set b_switch1 bits (M1, M2, M3)
-    if (relays.M1) b_switch1 |= 0x20; // bit 5
-    if (relays.M2) b_switch1 |= 0x40; // bit 6
-    if (relays.M3) b_switch1 |= 0x80; // bit 7
-
-    // Set b_switch2 bits (M4, M5, CMP)
-    if (relays.M4) b_switch2 |= 0x01; // bit 0
-    if (relays.M5) b_switch2 |= 0x02; // bit 1
-    if (relays.CMP) b_switch2 |= 0x04; // bit 2
-
-    const commandData = new Uint8Array([0x63, b_switch1, b_switch2]);
-    await this.sendCommand(0xF1, commandData);
+    logService.warn('BLE-TX', 'controlRelays not yet implemented for UDS protocol');
   }
   
   // Mock data for testing when Bluetooth is not available
