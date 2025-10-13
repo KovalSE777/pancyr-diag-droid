@@ -58,7 +58,7 @@ export const DebugLogPanel = () => {
   };
 
   return (
-    <Card className="fixed bottom-4 left-4 right-4 z-50 bg-slate-900/95 border-slate-700 backdrop-blur-sm">
+    <Card className="fixed bottom-4 left-4 right-4 z-[9999] bg-slate-900/95 border-slate-700 backdrop-blur-sm">
       <div className="flex items-center justify-between p-3 border-b border-slate-700">
         <div className="flex items-center gap-2">
           <Terminal className="w-4 h-4 text-green-400" />

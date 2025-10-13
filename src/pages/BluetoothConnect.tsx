@@ -8,7 +8,7 @@ import { capacitorBluetoothService } from "@/utils/capacitor-bluetooth";
 import { useToast } from "@/hooks/use-toast";
 import bluetoothIcon from "@/assets/bluetooth-icon.png";
 import { Capacitor } from "@capacitor/core";
-import { DebugLogPanel } from "@/components/diagnostics/DebugLogPanel";
+
 import { BleClient } from '@capacitor-community/bluetooth-le';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 const BluetoothConnect = () => {
@@ -313,7 +313,7 @@ const BluetoothConnect = () => {
         </DialogContent>
       </Dialog>
       
-      <DebugLogPanel />
+      
     </div>
   );
 };

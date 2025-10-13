@@ -10,6 +10,7 @@ import Diagnostics from "./pages/Diagnostics";
 import RepairGuide from "./pages/RepairGuide";
 import BLEDebug from "./pages/BLEDebug";
 import NotFound from "./pages/NotFound";
+import { DebugLogPanel } from "@/components/diagnostics/DebugLogPanel";
 
 const queryClient = new QueryClient();
 
@@ -30,6 +31,7 @@ const App = () => (
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
+      <DebugLogPanel />
     </TooltipProvider>
   </QueryClientProvider>
 );

@@ -15,7 +15,7 @@ import { SoftStartSignals } from "@/components/diagnostics/SoftStartSignals";
 import { TestModeControl } from "@/components/diagnostics/TestModeControl";
 import { Capacitor } from "@capacitor/core";
 import { useToast } from "@/hooks/use-toast";
-import { DebugLogPanel } from "@/components/diagnostics/DebugLogPanel";
+
 
 const Diagnostics = () => {
   const navigate = useNavigate();
@@ -550,8 +550,6 @@ const Diagnostics = () => {
         )}
       </main>
       
-      {/* Bottom Debug Log Panel - always visible when not in mock mode */}
-      {!useMock && <DebugLogPanel />}
     </div>
   );
 };
