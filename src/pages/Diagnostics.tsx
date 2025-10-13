@@ -22,6 +22,14 @@ const Diagnostics = () => {
   const [searchParams] = useSearchParams();
   const [data, setData] = useState<DiagnosticData | null>(null);
   const [isLive, setIsLive] = useState(false);
+  const [showDebug, setShowDebug] = useState(false);
+  const [connectionInfo, setConnectionInfo] = useState({
+    connected: false,
+    lastRequest: '',
+    lastResponse: '',
+    requestCount: 0,
+    responseCount: 0
+  });
   const { toast } = useToast();
   
   const systemType = searchParams.get('type') || 'ska';
@@ -98,18 +106,33 @@ const Diagnostics = () => {
     // Request real data from Bluetooth immediately
     const fetchData = async () => {
       try {
+        const reqTime = new Date().toLocaleTimeString();
+        setConnectionInfo(prev => ({ 
+          ...prev, 
+          connected: service.isConnected(),
+          lastRequest: reqTime,
+          requestCount: prev.requestCount + 1
+        }));
+        
         await service.requestDiagnosticData();
+        
         // Wait a bit for data to arrive
         setTimeout(() => {
           const liveData = service.getLatestData();
           if (liveData) {
+            const respTime = new Date().toLocaleTimeString();
             console.log('✅ Got live data:', liveData);
             setData(liveData);
             setIsLive(true);
+            setConnectionInfo(prev => ({ 
+              ...prev, 
+              lastResponse: respTime,
+              responseCount: prev.responseCount + 1
+            }));
           } else {
             console.warn('⚠️ No live data received yet');
           }
-        }, 2000); // Увеличил таймаут до 2 секунд
+        }, 2000);
       } catch (error) {
         console.error('Failed to request diagnostic data:', error);
         toast({
@@ -213,6 +236,14 @@ const Diagnostics = () => {
               <Badge className={`${getModeColor()} text-[10px] sm:text-xs px-1.5 sm:px-2`}>
                 {getModeText()}
               </Badge>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowDebug(!showDebug)}
+                className="text-xs px-2 border-primary text-primary"
+              >
+                {showDebug ? 'Скрыть' : 'Логи BLE'}
+              </Button>
             </div>
           </div>
           <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-foreground text-center">
@@ -222,8 +253,44 @@ const Diagnostics = () => {
       </header>
 
       <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4 sm:space-y-6">
+        {/* BLE Connection Debug Info */}
+        {!useMock && showDebug && (
+          <Card className="p-4 bg-slate-900 border-primary">
+            <h3 className="text-sm font-bold text-white mb-3">📡 Состояние BLE подключения</h3>
+            <div className="space-y-2 text-xs font-mono">
+              <div className="flex justify-between items-center p-2 bg-slate-800 rounded">
+                <span className="text-slate-400">Подключено:</span>
+                <span className={connectionInfo.connected ? 'text-green-400' : 'text-red-400'}>
+                  {connectionInfo.connected ? '✅ Да' : '❌ Нет'}
+                </span>
+              </div>
+              <div className="flex justify-between items-center p-2 bg-slate-800 rounded">
+                <span className="text-slate-400">Запросов отправлено:</span>
+                <span className="text-blue-400">{connectionInfo.requestCount}</span>
+              </div>
+              <div className="flex justify-between items-center p-2 bg-slate-800 rounded">
+                <span className="text-slate-400">Последний запрос:</span>
+                <span className="text-yellow-400">{connectionInfo.lastRequest || '-'}</span>
+              </div>
+              <div className="flex justify-between items-center p-2 bg-slate-800 rounded">
+                <span className="text-slate-400">Ответов получено:</span>
+                <span className="text-green-400">{connectionInfo.responseCount}</span>
+              </div>
+              <div className="flex justify-between items-center p-2 bg-slate-800 rounded">
+                <span className="text-slate-400">Последний ответ:</span>
+                <span className="text-green-400">{connectionInfo.lastResponse || '-'}</span>
+              </div>
+              {connectionInfo.requestCount > 0 && connectionInfo.responseCount === 0 && (
+                <div className="p-3 bg-red-900/30 border border-red-500 rounded text-red-300">
+                  ⚠️ Запросы отправляются, но ответов нет. Проверьте UUID сервисов в BLE Debug.
+                </div>
+              )}
+            </div>
+          </Card>
+        )}
+
         {/* Test Mode Control */}
-        <TestModeControl 
+        <TestModeControl
           systemType={systemType.toUpperCase() as 'SKA' | 'SKE'}
           onTestModeChange={handleTestModeChange}
           onRelayControl={handleRelayControl}
@@ -483,7 +550,8 @@ const Diagnostics = () => {
         )}
       </main>
       
-      <DebugLogPanel />
+      {/* Bottom Debug Log Panel - always visible when not in mock mode */}
+      {!useMock && <DebugLogPanel />}
     </div>
   );
 };
