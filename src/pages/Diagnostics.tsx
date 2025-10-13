@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, Activity, AlertTriangle, Zap, Thermometer, Gauge, Wind, BookOpen } from "lucide-react";
+import { ArrowLeft, Activity, AlertTriangle, Zap, Thermometer, Gauge, Wind, BookOpen, Bluetooth } from "lucide-react";
 import { useEffect, useState } from "react";
 import { bluetoothService } from "@/utils/bluetooth";
 import { capacitorBluetoothService } from "@/utils/capacitor-bluetooth";
@@ -172,6 +172,27 @@ const Diagnostics = () => {
               <span className="hidden sm:inline">Назад</span>
             </Button>
             <div className="flex items-center gap-1 sm:gap-2">
+              {!useMock && (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={async () => {
+                    const isNative = Capacitor.isNativePlatform();
+                    const service = isNative ? capacitorBluetoothService : bluetoothService;
+                    await service.disconnect();
+                    toast({
+                      title: "Отключено",
+                      description: "Bluetooth соединение разорвано"
+                    });
+                    navigate(`/bluetooth-connect?type=${systemType}`);
+                  }}
+                  className="text-xs sm:text-sm px-2 sm:px-3"
+                >
+                  <Bluetooth className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+                  <span className="hidden sm:inline">Отключиться</span>
+                  <span className="sm:hidden">Выйти</span>
+                </Button>
+              )}
               <Button
                 variant="outline"
                 size="sm"
