@@ -1,7 +1,7 @@
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { ArrowLeft, Bluetooth, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
+import { ArrowLeft, Bluetooth, Loader2, CheckCircle2, AlertCircle, Wrench } from "lucide-react";
 import { useState } from "react";
 import { bluetoothService } from "@/utils/bluetooth";
 import { capacitorBluetoothService } from "@/utils/capacitor-bluetooth";
@@ -150,7 +150,14 @@ const BluetoothConnect = () => {
             Назад
           </Button>
           <h1 className="text-2xl font-bold text-foreground">Подключение</h1>
-          <div className="w-24" />
+          <Button
+            variant="ghost"
+            onClick={() => navigate('/ble-debug')}
+            className="text-muted-foreground hover:text-primary"
+            title="Расширенная отладка BLE"
+          >
+            <Wrench className="h-5 w-5" />
+          </Button>
         </div>
       </header>
 

@@ -8,6 +8,7 @@ import SystemSelect from "./pages/SystemSelect";
 import BluetoothConnect from "./pages/BluetoothConnect";
 import Diagnostics from "./pages/Diagnostics";
 import RepairGuide from "./pages/RepairGuide";
+import BLEDebug from "./pages/BLEDebug";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -24,6 +25,7 @@ const App = () => (
           <Route path="/bluetooth-connect" element={<BluetoothConnect />} />
           <Route path="/diagnostics" element={<Diagnostics />} />
           <Route path="/repair-guide" element={<RepairGuide />} />
+          <Route path="/ble-debug" element={<BLEDebug />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
