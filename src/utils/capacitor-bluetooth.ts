@@ -153,6 +153,87 @@ export class CapacitorBluetoothService {
     }
   }
 
+  async connectToDeviceId(deviceId: string, systemType: 'SKA' | 'SKE' = 'SKA'): Promise<boolean> {
+    try {
+      this.systemType = systemType;
+      logService.info('BLE Native', `Connecting to device: ${deviceId}`);
+      
+      await this.initialize();
+
+      await BleClient.connect(deviceId, () => {
+        if (this.deviceId === deviceId) this.deviceId = null;
+      });
+
+      const services = await BleClient.getServices(deviceId);
+      let profile: 'NUS' | 'HM10' | null = null;
+      let rxChar: string | null = null;
+      let txChar: string | null = null;
+      let svcUuid: string | null = null;
+
+      for (const s of services) {
+        const su = s.uuid.toLowerCase();
+        if (this.isUuid(su, '6e400001-b5a3-f393-e0a9-e50e24dcca9e')) {
+          const rx = s.characteristics?.find(c => this.isUuid(c.uuid, '6e400003-b5a3-f393-e0a9-e50e24dcca9e'));
+          const tx = s.characteristics?.find(c => this.isUuid(c.uuid, '6e400002-b5a3-f393-e0a9-e50e24dcca9e'));
+          if (rx && tx) {
+            profile = 'NUS';
+            rxChar = this.to128('6e400003-b5a3-f393-e0a9-e50e24dcca9e');
+            txChar = this.to128('6e400002-b5a3-f393-e0a9-e50e24dcca9e');
+            svcUuid = this.to128('6e400001-b5a3-f393-e0a9-e50e24dcca9e');
+            break;
+          }
+        }
+        if (this.isUuid(su, 'ffe0')) {
+          const chars = s.characteristics || [];
+          const ffe1 = chars.find((c: any) => this.isUuid(c.uuid, 'ffe1')) as any;
+          const ffe2 = chars.find((c: any) => this.isUuid(c.uuid, 'ffe2')) as any;
+          let rx = [ffe1, ffe2].find((c: any) => c && c.properties?.notify) || null;
+          let tx = [ffe1, ffe2].find((c: any) => c && (c.properties?.write || c.properties?.writeWithoutResponse) && c !== rx) || rx;
+          if (rx) {
+            profile = 'HM10';
+            rxChar = this.to128((rx as any).uuid);
+            txChar = this.to128(((tx as any)?.uuid) || (rx as any).uuid);
+            svcUuid = this.to128('ffe0');
+            break;
+          }
+          if (ffe1) {
+            profile = 'HM10';
+            rxChar = this.to128('ffe1');
+            txChar = this.to128('ffe1');
+            svcUuid = this.to128('ffe0');
+            break;
+          }
+        }
+      }
+
+      if (profile) {
+        this.deviceId = deviceId;
+        this.UART_SERVICE_UUID = svcUuid!;
+        this.UART_RX_CHAR_UUID = rxChar!;
+        this.UART_TX_CHAR_UUID = txChar!;
+        logService.success('BLE Native', `Profile: ${profile}`);
+
+        await BleClient.startNotifications(
+          this.deviceId,
+          this.UART_SERVICE_UUID,
+          this.UART_RX_CHAR_UUID,
+          (value) => this.handleDataReceived(value)
+        );
+
+        logService.success('BLE Native', 'Connected successfully');
+        return true;
+      }
+
+      await BleClient.disconnect(deviceId).catch(() => {});
+      return false;
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      logService.error('BLE Native', `Connection failed: ${errorMsg}`);
+      try { await BleClient.disconnect(deviceId); } catch {}
+      return false;
+    }
+  }
+
   async disconnect(): Promise<void> {
     if (this.deviceId) {
       try {
