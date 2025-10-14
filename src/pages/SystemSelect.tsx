@@ -2,7 +2,6 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ArrowLeft, Bluetooth, BookOpen } from "lucide-react";
-import { useEffect } from "react";
 import acSystemIcon from "@/assets/ac-system-icon.png";
 import { SystemType } from "@/types/bluetooth";
 

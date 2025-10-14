@@ -15,6 +15,7 @@ import { TestModeControl } from "@/components/diagnostics/TestModeControl";
 import { LiveHexMonitor, HexFrame } from "@/components/diagnostics/LiveHexMonitor";
 import { Capacitor } from "@capacitor/core";
 import { useToast } from "@/hooks/use-toast";
+import { BT_TIMING } from "@/utils/bluetooth-constants";
 
 
 const Diagnostics = () => {
@@ -126,7 +127,7 @@ const Diagnostics = () => {
             lastResponse: new Date().toLocaleTimeString()
           }));
         }
-      }, 2000); // Используем константу из bluetooth-constants
+      }, BT_TIMING.UI_POLLING_INTERVAL);
     }
 
     return () => {
