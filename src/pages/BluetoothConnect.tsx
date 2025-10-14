@@ -8,7 +8,7 @@ import { capacitorBluetoothService } from "@/utils/capacitor-bluetooth";
 import { useToast } from "@/hooks/use-toast";
 import bluetoothIcon from "@/assets/bluetooth-icon.png";
 import { Capacitor } from "@capacitor/core";
-import { BluetoothSerial } from '@e-is/capacitor-bluetooth-serial';
+import { BluetoothSerial } from '@/utils/native-bluetooth';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 const BluetoothConnect = () => {
   const navigate = useNavigate();

@@ -4,7 +4,8 @@ export interface BluetoothSerialPlugin {
   connect(opts: { mac: string; uuid?: string }): Promise<void>;
   write(opts: { data: string }): Promise<void>; // base64
   disconnect(): Promise<void>;
-  addListener(event: 'data', cb: (ev: { data: string }) => void): Promise<void>; // <-- 'data'
+  scan(): Promise<{ devices: Array<{ address: string; name: string }> }>;
+  addListener(event: 'data', cb: (ev: { data: string }) => void): Promise<void>;
 }
 
 export const BluetoothSerial = registerPlugin<BluetoothSerialPlugin>('BluetoothSerial');

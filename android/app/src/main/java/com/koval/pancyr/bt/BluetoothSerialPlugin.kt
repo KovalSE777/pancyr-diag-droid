@@ -125,4 +125,36 @@ class BluetoothSerialPlugin : Plugin() {
             call.reject("disconnect failed: ${e.message}")
         }
     }
+    
+    @PluginMethod
+    fun scan(call: PluginCall) {
+        if (!hasPermission("btConnect") || !hasPermission("btScan")) {
+            requestAllPermissions(object : PermissionCallback {
+                override fun onPermissionsResult(results: Array<String>) {
+                    scan(call)
+                }
+            }, "btScan")
+            return
+        }
+        
+        try {
+            val adapter = BluetoothAdapter.getDefaultAdapter()
+            val pairedDevices = adapter.bondedDevices
+            val devices = JSObject()
+            val deviceArray = mutableListOf<JSObject>()
+            
+            for (device in pairedDevices) {
+                val dev = JSObject()
+                dev.put("address", device.address)
+                dev.put("name", device.name ?: "Unknown")
+                deviceArray.add(dev)
+            }
+            
+            devices.put("devices", deviceArray)
+            call.resolve(devices)
+        } catch (e: Exception) {
+            Log.e(TAG, "scan error", e)
+            call.reject("scan failed: ${e.message}")
+        }
+    }
 }
