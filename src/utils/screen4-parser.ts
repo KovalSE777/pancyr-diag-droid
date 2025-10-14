@@ -1,4 +1,5 @@
 import { DiagnosticData, ComponentStatus } from '@/types/bluetooth';
+import { adc8ToTempA, adc8ToTempB, adc8ToPressureBar } from './adc-conversion';
 
 /**
  * Парсер данных экрана 4 (33 байта payload)
@@ -267,15 +268,15 @@ export class Screen4Parser {
       dUP_M2,
       dUP_M3,
 
-      // Температуры (TODO: Требуются формулы конвертации из прошивки)
-      // Пока используем заглушки - нужны ADC значения и калибровочные коэффициенты
-      T_air: 22.0,   // Заглушка - нужна формула: T_air = f(ADC_value)
-      T_isp: -5.0,   // Заглушка - нужна формула: T_isp = f(ADC_value)
-      T_kmp: 45.0,   // Заглушка - нужна формула: T_kmp = f(ADC_value)
+      // Температуры (используем калибровочные таблицы из прошивки)
+      // ADC bytes: 24=T_air, 25=T_isp, 26=T_kmp
+      T_air: adc8ToTempA(payload[24]),  // Воздух - таблица A
+      T_isp: adc8ToTempA(payload[25]),  // Испаритель - таблица A
+      T_kmp: adc8ToTempB(payload[26]),  // Компрессор - таблица B
 
       // Напряжение и давление
       U_nap,
-      U_davl: 128, // TODO: Нужна формула конвертации ADC → давление
+      U_davl: adc8ToPressureBar(payload[23]), // Давление в барах
 
       // Количество вентиляторов
       kUM1_cnd,
