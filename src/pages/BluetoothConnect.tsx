@@ -99,7 +99,15 @@ const BluetoothConnect = () => {
       await stopScan();
       setIsConnecting(true);
       setConnectionStatus('connecting');
-      toast({ title: 'Подключение...', description: 'Может появиться запрос PIN — введите 1234' });
+      
+      console.log('Connecting to device:', deviceId);
+      
+      // Проверяем формат MAC-адреса
+      if (!deviceId || !/^[0-9A-Fa-f:]{17}$/.test(deviceId)) {
+        throw new Error(`Неверный формат MAC-адреса: "${deviceId}". Ожидается формат XX:XX:XX:XX:XX:XX`);
+      }
+      
+      toast({ title: 'Подключение...', description: `MAC: ${deviceId}. Может появиться запрос PIN — введите 1234` });
 
       const ok = await capacitorBluetoothService.connectToDeviceId(deviceId, systemType.toUpperCase() as 'SKA' | 'SKE');
       if (ok) {
