@@ -66,18 +66,25 @@ export class CapacitorBluetoothService {
     try {
       this.systemType = systemType;
       await this.initialize();
-      await BluetoothSerial.connect({ address: deviceAddress });
       
+      // Сначала подписываемся на данные, потом connect
       this.deviceAddress = deviceAddress;
       this.startReading();
       
-      await new Promise(resolve => setTimeout(resolve, 150));
+      // Подключаемся и ждём установления соединения
+      await BluetoothSerial.connect({ address: deviceAddress });
+      logService.success('BT Serial', 'Socket connected');
+      
+      // Пауза 200 мс для стабилизации соединения
+      await new Promise(resolve => setTimeout(resolve, 200));
+      
+      // Только ПОСЛЕ паузы отправляем первую команду
       await this.sendStartCommunication();
       
       this.connectionEstablished = true;
       this.startTesterPresent();
       
-      logService.success('BT Serial', 'Connected');
+      logService.success('BT Serial', 'Ready');
       return true;
     } catch (error) {
       logService.error('BT Serial', `Connection failed: ${error}`);
@@ -94,8 +101,12 @@ export class CapacitorBluetoothService {
         if (result.value) {
           const bytes = this.hexToBytes(result.value);
           const hex = this.bytesToHex(bytes);
+          
+          // Логируем сырые данные ДО парсинга
+          const hexFormatted = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join(' ').toUpperCase();
+          logService.info('BT-RX raw', hexFormatted);
+          
           this.addHexFrame('RX', hex);
-          logService.info('BT-RX', `${bytes.length}b: ${hex}`);
           
           this.parser.feed(bytes, (frame) => this.handleParsedFrame(frame));
         }
@@ -144,7 +155,7 @@ export class CapacitorBluetoothService {
     
     if (frame.type === 'TEL_88') {
       const nScr = frame.info?.nScr;
-      logService.success('PROTO', `✓ 0x88 Screen=${nScr}, CHK=${frame.ok ? 'OK' : 'FAIL'}`);
+      logService.success('BT-RX frame', `✓ 0x88 Screen=${nScr}, CHK=${frame.ok ? 'OK' : 'FAIL'}, ${hex}`);
       
       if (nScr === 4 && frame.ok) {
         const diagnosticData = Screen4Parser.parse(frame.raw.slice(3, 3 + (frame.raw[2] & 0xFF)), this.systemType);
@@ -156,37 +167,38 @@ export class CapacitorBluetoothService {
     }
     else if (frame.type === 'SCR_66') {
       const nScr = frame.info?.nScr ?? 0;
-      logService.success('PROTO', `✓ 0x66 SCR_${nScr}`);
+      logService.success('BT-RX frame', `✓ 0x66 SCR_${nScr}, ${hex}`);
       
       const ack = ackUOKS(nScr);
       this.sendRaw(ack).catch(() => {});
       const ackHex = [...ack].map(b => b.toString(16).padStart(2, '0')).join(' ').toUpperCase();
       this.addHexFrame('TX', ackHex, true, `ACK UOKS${nScr}`);
-      logService.info('BT-TX', `UOKS${nScr} (${ackHex})`);
+      logService.info('BT-TX', `UOKS${nScr} → ${ackHex}`);
     }
     else if (frame.type === 'CFG_77') {
       const nPak = frame.info?.nPak ?? 0;
-      logService.success('PROTO', `✓ 0x77 Package=${nPak}, CHK=${frame.ok ? 'OK' : 'FAIL'}`);
+      logService.success('BT-RX frame', `✓ 0x77 Package=${nPak}, CHK=${frame.ok ? 'OK' : 'FAIL'}, ${hex}`);
       
       const ack = ackUOKP(nPak);
       this.sendRaw(ack).catch(() => {});
       const ackHex = [...ack].map(b => b.toString(16).padStart(2, '0')).join(' ').toUpperCase();
       this.addHexFrame('TX', ackHex, true, `ACK UOKP${nPak}`);
-      logService.info('BT-TX', `UOKP${nPak} (${ackHex})`);
+      logService.info('BT-TX', `UOKP${nPak} → ${ackHex}`);
     }
     else if (frame.type === 'UDS_80P') {
       const dst = frame.info?.dst ?? 0;
       const src = frame.info?.src ?? 0;
       const sid = frame.info?.sid ?? 0;
       
+      // Принимаем все UDS, но выделяем ответы от БСКУ (0xF1←0x28)
       if (dst === 0xF1 && src === 0x28) {
-        logService.success('BT-RX', `✓ UDS Response: DST=0x${dst.toString(16).toUpperCase()} SRC=0x${src.toString(16).toUpperCase()} SID=0x${sid.toString(16).toUpperCase()}, CHK=${frame.ok ? 'OK' : 'FAIL'}`);
+        logService.success('BT-RX frame', `✓ UDS Response 0x${dst.toString(16).toUpperCase()}←0x${src.toString(16).toUpperCase()} SID=0x${sid.toString(16).toUpperCase()}, CHK=${frame.ok ? 'OK' : 'FAIL'}, ${hex}`);
       } else {
-        logService.info('BT-RX', `UDS: DST=0x${dst.toString(16).toUpperCase()} SRC=0x${src.toString(16).toUpperCase()} SID=0x${sid.toString(16).toUpperCase()}, CHK=${frame.ok ? 'OK' : 'FAIL'}`);
+        logService.info('BT-RX frame', `UDS 0x${dst.toString(16).toUpperCase()}←0x${src.toString(16).toUpperCase()} SID=0x${sid.toString(16).toUpperCase()}, CHK=${frame.ok ? 'OK' : 'FAIL'}, ${hex}`);
       }
     }
     else if (!frame.ok) {
-      logService.error('PROTO', `✗ Checksum FAIL: ${hex}`);
+      logService.error('BT-RX frame', `✗ Checksum FAIL: ${hex}`);
     }
   }
 
@@ -199,8 +211,8 @@ export class CapacitorBluetoothService {
 
   private async sendUDSCommand(packet: Uint8Array): Promise<void> {
     if (!this.deviceAddress) throw new Error('Not connected');
-    const hex = this.bytesToHex(packet);
-    logService.info('BT-TX', `UDS: ${hex}`);
+    const hex = Array.from(packet).map(b => b.toString(16).padStart(2, '0')).join(' ').toUpperCase();
+    logService.info('BT-TX', `UDS → ${hex}`);
     await this.sendRaw(packet);
   }
 
