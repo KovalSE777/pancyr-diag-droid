@@ -22,6 +22,18 @@ export function sum8(a: Uint8Array, n?: number): number {
 }
 
 export function buildUDS(dst = 0x28, src = 0xF0, sid: number, data: number[] = []): Uint8Array {
+  // Валидация входных параметров
+  if (dst < 0 || dst > 255) throw new Error(`Invalid dst address: ${dst}. Must be 0-255`);
+  if (src < 0 || src > 255) throw new Error(`Invalid src address: ${src}. Must be 0-255`);
+  if (sid < 0 || sid > 255) throw new Error(`Invalid SID: ${sid}. Must be 0-255`);
+  
+  // Проверка data на валидность
+  for (let i = 0; i < data.length; i++) {
+    if (data[i] < 0 || data[i] > 255) {
+      throw new Error(`Invalid data byte at index ${i}: ${data[i]}. Must be 0-255`);
+    }
+  }
+  
   const body = Uint8Array.from([dst, src, sid, ...data]);
   const B = body.length + 1;              // +CHK
   const hdr = 0x80 | ((B - 2) & 0x3F);

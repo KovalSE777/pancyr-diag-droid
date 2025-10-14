@@ -426,7 +426,13 @@ const Diagnostics = () => {
               icon={Gauge}
               label="Датчик давления"
               status={data.pressureSensorStatus}
-              value={`${((data.U_davl / 255) * 100).toFixed(0)}%`}
+              value={`${data.U_davl.toFixed(1)} bar`}
+            />
+            <ComponentIndicator 
+              icon={Zap}
+              label="Питание"
+              status={data.powerStatus || 'ok'}
+              value={data.powerSupplyOk ? `${data.batteryVoltage?.toFixed(1)}V` : 'Ошибка'}
             />
             <ComponentIndicator 
               icon={Zap}

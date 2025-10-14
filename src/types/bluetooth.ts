@@ -59,6 +59,13 @@ export interface DiagnosticData {
   condenserStatus: ComponentStatus;
   evaporatorStatus: ComponentStatus;
   pressureSensorStatus: ComponentStatus;
+  
+  // Power system status
+  powerStatus?: ComponentStatus;      // Статус системы питания
+  batteryVoltage?: number;           // Напряжение батареи (если применимо)
+  powerSupplyOk?: boolean;           // Питание в норме
+  
+  // Soft start module
   softStartStatus: ComponentStatus;
   
   // Component detailed diagnostics (zmk/obr - short circuit/break)

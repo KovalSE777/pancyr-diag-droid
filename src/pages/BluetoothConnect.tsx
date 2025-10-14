@@ -25,6 +25,7 @@ const BluetoothConnect = () => {
   const [devicePickerOpen, setDevicePickerOpen] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [devices, setDevices] = useState<DiscoveredDevice[]>([]);
+  const [cancelRequested, setCancelRequested] = useState(false); // Флаг отмены подключения
   
   const systemType = searchParams.get('type') || 'ska';
 
@@ -107,6 +108,7 @@ const BluetoothConnect = () => {
       await stopScan();
       setIsConnecting(true);
       setConnectionStatus('connecting');
+      setCancelRequested(false); // Сброс флага отмены
       
       console.log('Connecting to device:', deviceId);
       
@@ -118,6 +120,15 @@ const BluetoothConnect = () => {
       toast({ title: 'Подключение...', description: `MAC: ${deviceId}. Может появиться запрос PIN — введите ${BT_DEFAULT_PIN}` });
 
       const ok = await capacitorBluetoothService.connectToDeviceId(deviceId, systemType.toUpperCase() as SystemType);
+      
+      // Проверяем, не была ли запрошена отмена
+      if (cancelRequested) {
+        logService.warn('BT Connect', 'Connection cancelled by user');
+        await capacitorBluetoothService.disconnect();
+        setConnectionStatus('idle');
+        return;
+      }
+      
       if (ok) {
         setConnectionStatus('connected');
         setIsConnected(true);
@@ -290,7 +301,18 @@ const BluetoothConnect = () => {
       </main>
 
       {/* Device picker (Native) */}
-      <Dialog open={devicePickerOpen} onOpenChange={(o) => { setDevicePickerOpen(o); if (!o) stopScan(); }}>
+      <Dialog open={devicePickerOpen} onOpenChange={(o) => { 
+        setDevicePickerOpen(o); 
+        if (!o) {
+          stopScan();
+          // Если закрывают диалог во время подключения, отменяем операцию
+          if (isConnecting) {
+            setCancelRequested(true);
+            setIsConnecting(false);
+            setConnectionStatus('idle');
+          }
+        }
+      }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Выберите устройство</DialogTitle>

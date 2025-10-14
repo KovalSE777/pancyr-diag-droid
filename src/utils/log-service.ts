@@ -1,3 +1,5 @@
+import { DATA_LIMITS } from './bluetooth-constants';
+
 export interface LogEntry {
   timestamp: Date;
   level: 'info' | 'warn' | 'error' | 'success';
@@ -7,7 +9,7 @@ export interface LogEntry {
 
 class LogService {
   private logs: LogEntry[] = [];
-  private maxLogs = 100;
+  private maxLogs = DATA_LIMITS.MAX_LOG_ENTRIES;
   private listeners: ((logs: LogEntry[]) => void)[] = [];
 
   log(level: LogEntry['level'], category: string, message: string) {

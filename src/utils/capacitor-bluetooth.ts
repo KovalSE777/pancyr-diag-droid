@@ -101,13 +101,22 @@ export class CapacitorBluetoothService {
     
     if (this.deviceAddress) {
       try {
+        // Защита от быстрого переподключения - даем время на очистку
+        const wasConnected = this.connectionEstablished;
+        
         await this.bt.disconnect();
         this.deviceAddress = null;
         this.connectionEstablished = false;
         this.parser.clearBuffer();
         this.hexFrames = [];
+        this.latestData = null;
+        
+        // Небольшая задержка перед следующим подключением
+        if (wasConnected) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
       } catch (error) {
-        console.error('Disconnect failed:', error);
+        logService.error('BT Serial', `Disconnect error: ${error}`);
       }
     }
   }
@@ -297,7 +306,14 @@ export class CapacitorBluetoothService {
       evaporatorFans: [{ id: 1, status: 'ok' }],
       compressorFans: [{ id: 1, status: 'ok' }],
       compressorStatus: 'ok', condenserStatus: 'ok', evaporatorStatus: 'ok',
-      pressureSensorStatus: 'ok', softStartStatus: 'ok',
+      pressureSensorStatus: 'ok', 
+      
+      // Power system mock
+      powerStatus: 'ok',
+      batteryVoltage: 27.4,
+      powerSupplyOk: true,
+      
+      softStartStatus: 'ok',
       zmk_V_isp1: false, obr_V_isp1: false, zmk_V_knd1: false, obr_V_knd1: true,
       zmk_COMP: false, obr_COMP: false,
       work_rej_cnd: 2, work_rej_isp: 2, work_rej_cmp: 2,

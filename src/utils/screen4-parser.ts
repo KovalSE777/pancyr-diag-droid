@@ -310,6 +310,12 @@ export class Screen4Parser {
       condenserStatus,
       evaporatorStatus,
       pressureSensorStatus,
+      
+      // Power system (на основе напряжения питания)
+      powerStatus: U_nap >= 22 && U_nap <= 30 ? 'ok' : 'error',
+      batteryVoltage: U_nap,
+      powerSupplyOk: U_nap >= 22 && U_nap <= 30,
+      
       softStartStatus: 'ok',
 
       // Диагностика (заглушки)
