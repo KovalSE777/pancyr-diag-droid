@@ -1,4 +1,5 @@
 import { DiagnosticData, ComponentStatus } from '@/types/bluetooth';
+import { logService } from './log-service';
 
 /**
  * ADC to Temperature conversion tables
@@ -64,12 +65,12 @@ export class Screen4Parser {
   static parse(payload: Uint8Array, systemType: 'SKA' | 'SKE' = 'SKA'): DiagnosticData | null {
     // Валидация systemType
     if (systemType !== 'SKA' && systemType !== 'SKE') {
-      console.error('Invalid systemType:', systemType, 'expected SKA or SKE');
+      logService.error('Screen4Parser', `Invalid systemType: ${systemType}, expected SKA or SKE`);
       return null;
     }
     
     if (payload.length < 33) {
-      console.error('Screen 4 payload too short:', payload.length, 'expected 33 bytes');
+      logService.error('Screen4Parser', `Payload too short: ${payload.length} bytes, expected 33`);
       return null;
     }
     
@@ -77,7 +78,7 @@ export class Screen4Parser {
     const requiredIndices = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32];
     for (const idx of requiredIndices) {
       if (payload[idx] === undefined) {
-        console.error(`Screen 4 payload invalid at index ${idx}`);
+        logService.error('Screen4Parser', `Payload invalid at index ${idx}`);
         return null;
       }
     }

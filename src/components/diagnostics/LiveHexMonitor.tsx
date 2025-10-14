@@ -33,7 +33,7 @@ export const LiveHexMonitor = ({ frames }: LiveHexMonitorProps) => {
   return (
     <Card className="p-4 bg-card border-border">
       <div className="flex items-center gap-2 mb-3">
-        <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+        <div className="h-2 w-2 rounded-full bg-success animate-pulse" />
         <h3 className="text-sm font-semibold text-foreground">Live HEX поток</h3>
       </div>
       
@@ -47,16 +47,16 @@ export const LiveHexMonitor = ({ frames }: LiveHexMonitorProps) => {
                 key={`${frame.timestamp}-${idx}`}
                 className={`p-2 rounded border ${
                   frame.direction === 'TX' 
-                    ? 'bg-blue-500/10 border-blue-500/30' 
-                    : 'bg-green-500/10 border-green-500/30'
+                    ? 'bg-accent/10 border-accent/30' 
+                    : 'bg-success/10 border-success/30'
                 }`}
               >
                 <div className="flex items-center justify-between mb-1">
                   <div className="flex items-center gap-2">
                     {frame.direction === 'TX' ? (
-                      <ArrowUpRight className="h-3 w-3 text-blue-500" />
+                      <ArrowUpRight className="h-3 w-3 text-accent" />
                     ) : (
-                      <ArrowDownRight className="h-3 w-3 text-green-500" />
+                      <ArrowDownRight className="h-3 w-3 text-success" />
                     )}
                     <Badge variant={frame.direction === 'TX' ? 'default' : 'secondary'} className="h-4 text-[10px]">
                       {frame.direction}

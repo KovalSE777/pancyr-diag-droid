@@ -16,6 +16,7 @@ import { LiveHexMonitor, HexFrame } from "@/components/diagnostics/LiveHexMonito
 import { Capacitor } from "@capacitor/core";
 import { useToast } from "@/hooks/use-toast";
 import { BT_TIMING } from "@/utils/bluetooth-constants";
+import { logService } from "@/utils/log-service";
 
 
 const Diagnostics = () => {
@@ -63,7 +64,7 @@ const Diagnostics = () => {
           : "Система вернулась в автоматический режим"
       });
     } catch (error) {
-      console.error('Failed to toggle test mode:', error);
+      logService.error('Test Mode', `Failed to toggle: ${error instanceof Error ? error.message : String(error)}`);
       toast({
         title: "Ошибка",
         description: "Не удалось переключить режим",
@@ -81,9 +82,9 @@ const Diagnostics = () => {
       if (!useMock) {
         await service.controlRelays({ [relay]: state });
       }
-      console.log(`Relay ${relay} set to ${state ? 'ON' : 'OFF'}`);
+      logService.success('Relay Control', `${relay} set to ${state ? 'ON' : 'OFF'}`);
     } catch (error) {
-      console.error(`Failed to control relay ${relay}:`, error);
+      logService.error('Relay Control', `Failed to control ${relay}: ${error instanceof Error ? error.message : String(error)}`);
       toast({
         title: "Ошибка управления",
         description: `Не удалось ${state ? 'включить' : 'выключить'} ${relay}`,
@@ -241,35 +242,35 @@ const Diagnostics = () => {
           <LiveHexMonitor frames={hexFrames} />
         )}
 
-        {/* BLE Connection Debug Info */}
+        {/* Connection Debug Info */}
         {!useMock && showDebug && (
-          <Card className="p-4 bg-slate-900 border-primary">
-            <h3 className="text-sm font-bold text-white mb-3">📡 Состояние BLE подключения</h3>
+          <Card className="p-4 bg-card border-primary">
+            <h3 className="text-sm font-bold text-foreground mb-3">📡 Состояние BLE подключения</h3>
             <div className="space-y-2 text-xs font-mono">
-              <div className="flex justify-between items-center p-2 bg-slate-800 rounded">
-                <span className="text-slate-400">Подключено:</span>
-                <span className={connectionInfo.connected ? 'text-green-400' : 'text-red-400'}>
+              <div className="flex justify-between items-center p-2 bg-muted rounded">
+                <span className="text-muted-foreground">Подключено:</span>
+                <span className={connectionInfo.connected ? 'text-success' : 'text-destructive'}>
                   {connectionInfo.connected ? '✅ Да' : '❌ Нет'}
                 </span>
               </div>
-              <div className="flex justify-between items-center p-2 bg-slate-800 rounded">
-                <span className="text-slate-400">Запросов отправлено:</span>
-                <span className="text-blue-400">{connectionInfo.requestCount}</span>
+              <div className="flex justify-between items-center p-2 bg-muted rounded">
+                <span className="text-muted-foreground">Запросов отправлено:</span>
+                <span className="text-accent">{connectionInfo.requestCount}</span>
               </div>
-              <div className="flex justify-between items-center p-2 bg-slate-800 rounded">
-                <span className="text-slate-400">Последний запрос:</span>
-                <span className="text-yellow-400">{connectionInfo.lastRequest || '-'}</span>
+              <div className="flex justify-between items-center p-2 bg-muted rounded">
+                <span className="text-muted-foreground">Последний запрос:</span>
+                <span className="text-warning">{connectionInfo.lastRequest || '-'}</span>
               </div>
-              <div className="flex justify-between items-center p-2 bg-slate-800 rounded">
-                <span className="text-slate-400">Ответов получено:</span>
-                <span className="text-green-400">{connectionInfo.responseCount}</span>
+              <div className="flex justify-between items-center p-2 bg-muted rounded">
+                <span className="text-muted-foreground">Ответов получено:</span>
+                <span className="text-success">{connectionInfo.responseCount}</span>
               </div>
-              <div className="flex justify-between items-center p-2 bg-slate-800 rounded">
-                <span className="text-slate-400">Последний ответ:</span>
-                <span className="text-green-400">{connectionInfo.lastResponse || '-'}</span>
+              <div className="flex justify-between items-center p-2 bg-muted rounded">
+                <span className="text-muted-foreground">Последний ответ:</span>
+                <span className="text-success">{connectionInfo.lastResponse || '-'}</span>
               </div>
               {connectionInfo.requestCount > 0 && connectionInfo.responseCount === 0 && (
-                <div className="p-3 bg-red-900/30 border border-red-500 rounded text-red-300">
+                <div className="p-3 bg-destructive/10 border border-destructive rounded text-destructive">
                   ⚠️ Запросы отправляются, но ответов нет. Проверьте UUID сервисов в BLE Debug.
                 </div>
               )}
@@ -438,7 +439,7 @@ const Diagnostics = () => {
               status={data.softStartStatus}
             />
             <div className="p-4 rounded-lg border-2 border-border bg-background/50">
-              <p className="text-sm font-semibold text-white mb-2">Статус системы</p>
+              <p className="text-sm font-semibold text-foreground mb-2">Статус системы</p>
               <p className="text-lg font-mono font-bold text-primary">0x{data.sSTATUS.toString(16).toUpperCase().padStart(2, '0')}</p>
             </div>
           </div>

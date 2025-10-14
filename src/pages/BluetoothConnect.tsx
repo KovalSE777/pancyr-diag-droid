@@ -104,7 +104,7 @@ const BluetoothConnect = () => {
       setConnectionStatus('connecting');
       setCancelRequested(false); // Сброс флага отмены
       
-      console.log('Connecting to device:', deviceId);
+      logService.info('BT Connect', `Connecting to device: ${deviceId}`);
       
       // Проверяем формат MAC-адреса
       if (!deviceId || !/^[0-9A-Fa-f:]{17}$/.test(deviceId)) {
