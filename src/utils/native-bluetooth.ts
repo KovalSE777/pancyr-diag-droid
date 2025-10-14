@@ -30,6 +30,11 @@ export class NativeBluetoothWrapper {
   private onData?: (u8: Uint8Array) => void;
 
   async connect(mac: string): Promise<void> {
+    // Проверяем формат MAC-адреса
+    if (!/^[0-9A-Fa-f:]{17}$/.test(mac)) {
+      throw new Error(`MAC not set or invalid: "${mac}"`);
+    }
+    
     // КРИТИЧНО: подписываемся ДО connect()
     await BluetoothSerial.addListener('data', ev => this.onData?.(fromB64(ev.data)));
     await BluetoothSerial.connect({ mac, uuid: SPP_UUID });

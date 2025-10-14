@@ -36,7 +36,15 @@ export class CapacitorBluetoothService {
     try {
       this.systemType = systemType;
       await this.initialize();
-      this.deviceAddress = deviceAddress;
+      
+      // Проверяем, что MAC-адрес передан корректно
+      const mac = deviceAddress ?? '';
+      if (!/^[0-9A-Fa-f:]{17}$/.test(mac)) {
+        logService.error('BT Serial', `MAC not set or invalid: "${mac}"`);
+        throw new Error(`MAC not set or invalid: "${mac}"`);
+      }
+      
+      this.deviceAddress = mac;
       
       // 1) КРИТИЧНО: подписываемся на данные ДО connect()
       this.bt.onBytes((chunk) => {
@@ -52,7 +60,7 @@ export class CapacitorBluetoothService {
       });
       
       // 2) Подключаемся к устройству
-      await this.bt.connect(deviceAddress);
+      await this.bt.connect(mac);
       logService.success('BT Serial', 'Socket connected');
       
       // 3) Пауза 200 мс для стабилизации соединения (как указано в документе)
@@ -114,6 +122,9 @@ export class CapacitorBluetoothService {
   private handleParsedFrame(frame: ParsedFrame): void {
     const hex = [...frame.raw].map(b => b.toString(16).padStart(2, '0')).join(' ').toUpperCase();
     
+    // Логируем все типы фреймов с детальной информацией
+    logService.info('BT-RX frame', `Type=${frame.type}, CHK=${frame.ok ? 'OK' : 'FAIL'}, Info=${JSON.stringify(frame.info ?? {})}, Hex=${hex}`);
+    
     if (frame.type === 'TEL_88') {
       const nScr = frame.info?.nScr;
       logService.success('BT-RX frame', `✓ 0x88 Screen=${nScr}, CHK=${frame.ok ? 'OK' : 'FAIL'}, ${hex}`);
@@ -151,12 +162,8 @@ export class CapacitorBluetoothService {
       const src = frame.info?.src ?? 0;
       const sid = frame.info?.sid ?? 0;
       
-      // Принимаем все UDS, но выделяем ответы от БСКУ (0xF1←0x28)
-      if (dst === 0xF1 && src === 0x28) {
-        logService.success('BT-RX frame', `✓ UDS Response 0x${dst.toString(16).toUpperCase()}←0x${src.toString(16).toUpperCase()} SID=0x${sid.toString(16).toUpperCase()}, CHK=${frame.ok ? 'OK' : 'FAIL'}, ${hex}`);
-      } else {
-        logService.info('BT-RX frame', `UDS 0x${dst.toString(16).toUpperCase()}←0x${src.toString(16).toUpperCase()} SID=0x${sid.toString(16).toUpperCase()}, CHK=${frame.ok ? 'OK' : 'FAIL'}, ${hex}`);
-      }
+      // НЕ ФИЛЬТРУЕМ по DST — правильный ответ DST=0xF1, SRC=0x28
+      logService.success('BT-RX frame', `✓ UDS 0x${dst.toString(16).toUpperCase()}←0x${src.toString(16).toUpperCase()} SID=0x${sid.toString(16).toUpperCase()}, CHK=${frame.ok ? 'OK' : 'FAIL'}, ${hex}`);
     }
     else if (!frame.ok) {
       logService.error('BT-RX frame', `✗ Checksum FAIL: ${hex}`);
