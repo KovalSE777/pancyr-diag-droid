@@ -2,23 +2,23 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ArrowLeft, Bluetooth, BookOpen } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import acSystemIcon from "@/assets/ac-system-icon.png";
+import { SystemType } from "@/types/bluetooth";
 
 const SystemSelect = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [systemType, setSystemType] = useState<'ska' | 'ske'>('ska');
+  const systemType: SystemType = (searchParams.get('type')?.toUpperCase() as SystemType) || 'SKA';
 
-  useEffect(() => {
-    const type = searchParams.get('type');
-    if (type === 'ska' || type === 'ske') {
-      setSystemType(type);
-    }
-  }, [searchParams]);
-
-  const systemInfo = {
-    ska: {
+  const systemInfo: Record<SystemType, {
+    title: string;
+    fullName: string;
+    description: string;
+    color: string;
+    components: string[];
+  }> = {
+    SKA: {
       title: 'СКА',
       fullName: 'Система кондиционирования аппаратуры',
       description: 'Диагностика аппаратурной части системы кондиционирования (2 вентилятора конденсатора)',
@@ -31,7 +31,7 @@ const SystemSelect = () => {
         '2 вентилятора конденсатора (M1, M2)'
       ]
     },
-    ske: {
+    SKE: {
       title: 'СКЭ',
       fullName: 'Система кондиционирования экипажа',
       description: 'Диагностика экипажной части системы кондиционирования (3 вентилятора конденсатора)',

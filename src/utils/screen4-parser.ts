@@ -1,5 +1,49 @@
 import { DiagnosticData, ComponentStatus } from '@/types/bluetooth';
-import { adc8ToTempA, adc8ToTempB, adc8ToPressureBar } from './adc-conversion';
+
+/**
+ * ADC to Temperature conversion tables
+ * Based on firmware calibration tables
+ */
+
+// Температура, вариант A (для воздуха/испарителя): ADC -> temp_x10 (°C * 10)
+const TEMP_TABLE_A: [number, number][] = [
+  [0x00, 29], [0x01, 29], [0x02, 30], [0x10, 38], [0x17, 40],
+  [0x49, 66], [0x6A, 80], [0x85, 95], [0xF0, 155], [0xFF, 165],
+];
+
+// Температура, вариант B (для компрессора)
+const TEMP_TABLE_B: [number, number][] = [
+  [0x01, 165], [0x10, 175], [0x20, 185], [0x30, 195], [0x40, 205],
+  [0x50, 215], [0x60, 225], [0x70, 235], [0xFF, 250],
+];
+
+// Давление: ADC -> P_x10 (бар * 10)
+const PRESS_TABLE: [number, number][] = [
+  [0, 0], [19, 1], [30, 3], [107, 15], [224, 34], [250, 38],
+];
+
+/**
+ * Linear interpolation helper
+ */
+function interp8(x: number, table: [number, number][]): number {
+  if (x <= table[0][0]) return table[0][1];
+  for (let i = 1; i < table.length; i++) {
+    const [x2, y2] = table[i];
+    const [x1, y1] = table[i - 1];
+    if (x <= x2) {
+      const dy = y2 - y1, dx = x2 - x1;
+      return Math.round(y1 + (dx ? (x - x1) * dy / dx : 0));
+    }
+  }
+  return table[table.length - 1][1];
+}
+
+/**
+ * ADC conversion functions
+ */
+const adc8ToTempA = (adc: number): number => interp8(adc & 0xFF, TEMP_TABLE_A) / 10;
+const adc8ToTempB = (adc: number): number => interp8(adc & 0xFF, TEMP_TABLE_B) / 10;
+const adc8ToPressureBar = (adc: number): number => interp8(adc & 0xFF, PRESS_TABLE) / 10;
 
 /**
  * Парсер данных экрана 4 (33 байта payload)

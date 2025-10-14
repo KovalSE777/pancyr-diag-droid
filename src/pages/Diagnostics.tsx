@@ -5,7 +5,6 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { ArrowLeft, Activity, AlertTriangle, Zap, Thermometer, Gauge, Wind, BookOpen, Bluetooth } from "lucide-react";
 import { useEffect, useState } from "react";
-import { bluetoothService } from "@/utils/bluetooth";
 import { capacitorBluetoothService } from "@/utils/capacitor-bluetooth";
 import { DiagnosticData, RelayType } from "@/types/bluetooth";
 import { FanIndicator } from "@/components/diagnostics/FanIndicator";
@@ -37,9 +36,9 @@ const Diagnostics = () => {
   const systemType = searchParams.get('type') || 'ska';
   const useMock = searchParams.get('mock') === 'true';
   
-  // Единая точка получения сервиса
+  // Bluetooth сервис (только capacitor в production)
   const isNative = Capacitor.isNativePlatform();
-  const service = isNative ? capacitorBluetoothService : bluetoothService;
+  const service = capacitorBluetoothService;
 
   const handleTestModeChange = async (enabled: boolean) => {
     
@@ -184,10 +183,8 @@ const Diagnostics = () => {
                 <Button
                   variant="destructive"
                   size="sm"
-                  onClick={async () => {
-                    const isNative = Capacitor.isNativePlatform();
-                    const service = isNative ? capacitorBluetoothService : bluetoothService;
-                    await service.disconnect();
+                onClick={async () => {
+                  await capacitorBluetoothService.disconnect();
                     toast({
                       title: "Отключено",
                       description: "Bluetooth соединение разорвано"

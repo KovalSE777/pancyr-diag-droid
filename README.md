@@ -1,73 +1,146 @@
-# Welcome to your Lovable project
+# Панцирь - Диагностическое приложение
 
-## Project info
+Профессиональная система диагностики для систем кондиционирования СКА (Система Кондиционирования Аппаратуры) и СКЭ (Система Кондиционирования Экипажа).
 
-**URL**: https://lovable.dev/projects/ba41ab0d-e47a-4687-9e70-cd17cee4dfd3
+## 🎯 Основные возможности
 
-## How can I edit this code?
+- **Bluetooth диагностика** - Подключение к БСКУ через Bluetooth Serial (Android) или Web Bluetooth (браузер)
+- **Мониторинг в реальном времени** - Отображение параметров работы системы
+- **Анализ ошибок** - Детальная диагностика неисправностей с рекомендациями по устранению
+- **База знаний** - Руководство по ремонту с пошаговыми инструкциями
+- **Тестовый режим** - Ручное управление компонентами для диагностики
 
-There are several ways of editing your application.
+## 🚀 Технологии
 
-**Use Lovable**
+- **Frontend**: React 18 + TypeScript + Vite
+- **UI**: Tailwind CSS + shadcn/ui
+- **Mobile**: Capacitor 7 (Android/iOS)
+- **Bluetooth**: 
+  - Android: Нативный Bluetooth Serial плагин
+  - Web: Web Bluetooth API
+- **State Management**: TanStack Query
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/ba41ab0d-e47a-4687-9e70-cd17cee4dfd3) and start prompting.
+## 📱 Поддерживаемые платформы
 
-Changes made via Lovable will be committed automatically to this repo.
+- **Android** - Нативное приложение с Bluetooth Serial
+- **Web/Desktop** - PWA с Web Bluetooth API
+- **iOS** - Через Capacitor (требует доработки Bluetooth)
 
-**Use your preferred IDE**
+## 🛠 Установка и запуск
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### Веб-версия
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+```bash
+npm install
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+### Android сборка
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+```bash
+# 1. Установите зависимости
+npm install
 
-**Use GitHub Codespaces**
+# 2. Соберите проект
+npm run build
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+# 3. Синхронизируйте с Capacitor
+npx cap sync android
 
-## What technologies are used for this project?
+# 4. Откройте в Android Studio
+npx cap open android
+```
 
-This project is built with:
+### Production APK
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+**ВАЖНО**: Перед сборкой production APK:
 
-## How can I deploy this project?
+1. В `capacitor.config.ts` закомментируйте секцию `server` (уже сделано)
+2. Соберите проект: `npm run build`
+3. Синхронизируйте: `npx cap sync android`
+4. Подпишите APK в Android Studio
 
-Simply open [Lovable](https://lovable.dev/projects/ba41ab0d-e47a-4687-9e70-cd17cee4dfd3) and click on Share -> Publish.
+## 📖 Структура проекта
 
-## Can I connect a custom domain to my Lovable project?
+```
+src/
+├── components/
+│   ├── diagnostics/      # Компоненты диагностики
+│   └── ui/              # UI компоненты (shadcn)
+├── pages/
+│   ├── Index.tsx        # Главная страница
+│   ├── SystemSelect.tsx # Выбор системы (СКА/СКЭ)
+│   ├── BluetoothConnect.tsx # Подключение Bluetooth
+│   ├── Diagnostics.tsx  # Экран диагностики
+│   └── RepairGuide.tsx  # База знаний
+├── utils/
+│   ├── capacitor-bluetooth.ts # Bluetooth сервис (Android)
+│   ├── protocol-parser.ts     # Парсер протокола БСКУ
+│   ├── screen4-parser.ts      # Парсер телеметрии
+│   ├── native-bluetooth.ts    # Обертка нативного плагина
+│   ├── bluetooth-constants.ts # Константы протокола
+│   └── log-service.ts         # Система логирования
+└── types/
+    └── bluetooth.ts     # TypeScript типы
+```
 
-Yes, you can!
+## 🔧 Протокол БСКУ
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+Приложение работает по протоколу, описанному в документации прошивки:
+- **UDS команды** - Управление и запрос данных
+- **Телеметрия 0x88** - Screen 4 с диагностическими данными
+- **Tester Present** - Поддержание соединения (каждые 1.5 сек)
+- **Periodic Read** - Запрос данных (каждую 1 сек)
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+### Основные UDS команды:
+- `0x10 0x03` - Start Communication
+- `0x3E 0x80` - Tester Present
+- `0x21 0x01` - Read Diagnostic Data (Screen 4)
+
+## 📝 Changelog последних изменений
+
+### Оптимизация и рефакторинг
+
+1. **Удалены неиспользуемые файлы:**
+   - `src/utils/bluetooth.ts` - Web Bluetooth (не используется в production)
+   - `src/utils/bluetooth-parser.ts` - Старый парсер (заменен на screen4-parser)
+   - `src/utils/adc-conversion.ts` - Дубликат (используется screen4-parser)
+   - `src/utils/checksum.ts` - Дубликат (используется protocol-parser)
+
+2. **Улучшены типы:**
+   - SystemType теперь 'SKA' | 'SKE' (верхний регистр)
+   - Унифицировано использование типов во всех файлах
+
+3. **Исправлены баги UI:**
+   - ComponentIndicator: текст теперь использует семантические цвета (text-foreground/text-muted-foreground вместо text-white)
+   - Улучшен контраст в темной теме
+
+4. **Обновлены метаданные:**
+   - SEO-оптимизированные теги в index.html
+   - Правильные Open Graph теги
+   - Русский язык как основной
+   - Mobile-оптимизированный viewport
+
+5. **Capacitor конфиг:**
+   - Добавлен backgroundColor для splash screen
+   - Упрощена конфигурация плагинов
+   - Улучшены комментарии для production/development
+
+## 🔐 Безопасность
+
+- Все Bluetooth соединения защищены на уровне ОС
+- Нет хранения чувствительных данных
+- Логи содержат только техническую информацию
+
+## 📄 Лицензия
+
+Proprietary - All rights reserved
+
+## 👥 Поддержка
+
+Для вопросов и поддержки обращайтесь к разработчикам проекта.
+
+---
+
+**Текущая версия**: 1.0
+**Последнее обновление**: 2025-10-14

@@ -3,7 +3,6 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ArrowLeft, Bluetooth, Loader2, CheckCircle2, AlertCircle, Wrench } from "lucide-react";
 import { useState } from "react";
-import { bluetoothService } from "@/utils/bluetooth";
 import { capacitorBluetoothService } from "@/utils/capacitor-bluetooth";
 import { useToast } from "@/hooks/use-toast";
 import bluetoothIcon from "@/assets/bluetooth-icon.png";
@@ -50,18 +49,13 @@ const BluetoothConnect = () => {
         throw new Error('Web Bluetooth API не поддерживается в этом браузере. Используйте Chrome на Android или установите мобильное приложение.');
       }
 
-      toast({ title: 'Поиск устройства...', description: 'Включите Bluetooth на БСКУ' });
-      setConnectionStatus('connecting');
-
-      const connected = await bluetoothService.connect(systemType.toUpperCase() as SystemType);
-      if (connected) {
-        setConnectionStatus('connected');
-        setIsConnected(true);
-        toast({ title: 'Подключено успешно', description: 'Связь с БСКУ установлена' });
-        setTimeout(() => navigate(`/diagnostics?type=${systemType}`), BT_TIMING.REDIRECT_DELAY);
-      } else {
-        throw new Error('Не удалось подключиться к устройству');
-      }
+      // Web Bluetooth в браузерах не используется - только мобильное приложение
+      toast({ 
+        title: 'Недоступно', 
+        description: 'Web Bluetooth не поддерживается. Используйте мобильное приложение.',
+        variant: 'destructive'
+      });
+      throw new Error('Используйте мобильное приложение для Bluetooth подключения');
     } catch (error) {
       setConnectionStatus('error');
       const errorMsg = error instanceof Error ? error.message : 'Не удалось подключиться к БСКУ';
