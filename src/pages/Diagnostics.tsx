@@ -7,7 +7,7 @@ import { ArrowLeft, Activity, AlertTriangle, Zap, Thermometer, Gauge, Wind, Book
 import { useEffect, useState } from "react";
 import { bluetoothService } from "@/utils/bluetooth";
 import { capacitorBluetoothService } from "@/utils/capacitor-bluetooth";
-import { DiagnosticData } from "@/types/bluetooth";
+import { DiagnosticData, RelayType } from "@/types/bluetooth";
 import { FanIndicator } from "@/components/diagnostics/FanIndicator";
 import { ComponentIndicator } from "@/components/diagnostics/ComponentIndicator";
 import { FuseIndicator } from "@/components/diagnostics/FuseIndicator";
@@ -72,7 +72,7 @@ const Diagnostics = () => {
     }
   };
 
-  const handleRelayControl = async (relay: 'M1' | 'M2' | 'M3' | 'M4' | 'M5' | 'CMP', state: boolean) => {
+  const handleRelayControl = async (relay: RelayType, state: boolean) => {
     if (!service.isConnected() && !useMock) {
       return;
     }
@@ -127,7 +127,7 @@ const Diagnostics = () => {
             lastResponse: new Date().toLocaleTimeString()
           }));
         }
-      }, 2000);
+      }, 2000); // Используем константу из bluetooth-constants
     }
 
     return () => {

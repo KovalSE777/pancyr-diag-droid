@@ -1,26 +1,22 @@
-import { DiagnosticData } from '@/types/bluetooth';
+import { DiagnosticData, SystemType } from '@/types/bluetooth';
 import { ProtocolParser, ParsedFrame, UDS_StartComm, UDS_TesterPres, UDS_Read21_01, ackUOKS, ackUOKP } from './protocol-parser';
 import { Screen4Parser } from './screen4-parser';
 import { logService } from './log-service';
 import { HexFrame } from '@/components/diagnostics/LiveHexMonitor';
 import { NativeBluetoothWrapper } from './native-bluetooth';
 import { bytesToHex, hexToBytes, formatBytes } from './hex';
+import { BT_TIMING, UDS_ADDRESSES, DATA_LIMITS } from './bluetooth-constants';
 
 export class CapacitorBluetoothService {
   private deviceAddress: string | null = null;
   private latestData: DiagnosticData | null = null;
-  private systemType: 'SKA' | 'SKE' = 'SKA';
+  private systemType: SystemType = 'SKA';
   private parser: ProtocolParser = new ProtocolParser();
   private testerPresentInterval: number | null = null;
   private connectionEstablished: boolean = false;
   private hexFrames: HexFrame[] = [];
   private onFramesUpdate?: (frames: HexFrame[]) => void;
   private bt: NativeBluetoothWrapper = new NativeBluetoothWrapper();
-  
-  private readonly BSKU_ADDRESS = 0x28;
-  private readonly TESTER_ADDRESS = 0xF0;
-  private readonly EXPECTED_DST = 0xF1;
-  private readonly EXPECTED_SRC = 0x28;
   
   async initialize(): Promise<void> {
     // Инициализация не требуется для нативного плагина
@@ -33,7 +29,7 @@ export class CapacitorBluetoothService {
     return false;
   }
 
-  async connectToDeviceId(deviceAddress: string, systemType: 'SKA' | 'SKE' = 'SKA'): Promise<boolean> {
+  async connectToDeviceId(deviceAddress: string, systemType: SystemType = 'SKA'): Promise<boolean> {
     try {
       // Валидация systemType
       if (systemType !== 'SKA' && systemType !== 'SKE') {
@@ -77,8 +73,8 @@ export class CapacitorBluetoothService {
       await this.bt.connect(mac);
       logService.success('BT Serial', 'Socket connected');
       
-      // 3) Пауза 200 мс для стабилизации соединения (как указано в документе)
-      await new Promise(resolve => setTimeout(resolve, 200));
+      // 3) Пауза для стабилизации соединения (как указано в документе)
+      await new Promise(resolve => setTimeout(resolve, BT_TIMING.CONNECTION_STABILIZATION_DELAY));
       
       // 4) Только ПОСЛЕ паузы отправляем первую команду
       await this.sendStartCommunication();
@@ -166,7 +162,7 @@ export class CapacitorBluetoothService {
       const src = frame.info?.src ?? 0;
       const sid = frame.info?.sid ?? 0;
       
-      // НЕ ФИЛЬТРУЕМ по DST — правильный ответ DST=0xF1, SRC=0x28
+      // НЕ ФИЛЬТРУЕМ по DST — правильный ответ DST=EXPECTED_DST, SRC=EXPECTED_SRC
       logService.success('BT-RX frame', `✓ UDS 0x${dst.toString(16).toUpperCase()}←0x${src.toString(16).toUpperCase()} SID=0x${sid.toString(16).toUpperCase()}, CHK=${frame.ok ? 'OK' : 'FAIL'}, ${hex}`);
     }
     else if (!frame.ok) {
@@ -199,9 +195,9 @@ export class CapacitorBluetoothService {
     
     this.hexFrames.push(frame);
     
-    // Храним только последние 100 кадров (увеличено с 50)
-    if (this.hexFrames.length > 100) {
-      this.hexFrames = this.hexFrames.slice(-100);
+    // Храним только последние кадры (из константы)
+    if (this.hexFrames.length > DATA_LIMITS.MAX_HEX_FRAMES) {
+      this.hexFrames = this.hexFrames.slice(-DATA_LIMITS.MAX_HEX_FRAMES);
     }
     
     this.onFramesUpdate?.(this.hexFrames);
@@ -229,7 +225,7 @@ export class CapacitorBluetoothService {
       if (this.isConnected()) {
         this.sendTesterPresent().catch(() => {});
       }
-    }, 1500); // Как указано в документе: каждые 1500 мс
+    }, BT_TIMING.TESTER_PRESENT_INTERVAL);
   }
 
   private stopTesterPresent(): void {
@@ -244,7 +240,7 @@ export class CapacitorBluetoothService {
       if (this.isConnected()) {
         this.requestDiagnosticData().catch(() => {});
       }
-    }, 1000); // Как указано в документе: каждые 1000 мс
+    }, BT_TIMING.PERIODIC_READ_INTERVAL);
   }
 
   private stopPeriodicRead(): void {
@@ -269,11 +265,25 @@ export class CapacitorBluetoothService {
 
   getMockData(systemType: string = 'SKA'): DiagnosticData {
     const isSKE = systemType.toUpperCase() === 'SKE';
+    
+    // Mock данные с реальными физическими значениями (после ADC конвертации)
     return {
+      // Напряжения вентиляторов (примерные значения из таблицы D_napr1)
       UP_M1: 27.5, UP_M2: 26.8, UP_M3: 27.1, UP_M4: 27.3, UP_M5: 27.0,
+      
+      // Падения напряжения (в вольтах)
       dUP_M1: 1.2, dUP_M2: 0.8, dUP_M3: 1.5,
-      T_air: 22.5, T_isp: -5.2, T_kmp: 45.8,
-      U_nap: 27.4, U_davl: 156,
+      
+      // Температуры (реальные значения в °C из калибровочных таблиц)
+      T_air: 22.5,   // Воздух - таблица A (~ADC 0x6A)
+      T_isp: -5.2,   // Испаритель - таблица A (~ADC 0x30)
+      T_kmp: 45.8,   // Компрессор - таблица B (~ADC 0x40)
+      
+      // Напряжение питания и давление (реальные физические единицы)
+      U_nap: 27.4,   // Вольты
+      U_davl: 1.5,   // Бары (из таблицы давления ~ADC 107)
+      
+      // Количество вентиляторов
       kUM1_cnd: isSKE ? 3 : 2, kUM2_isp: 1, kUM3_cmp: 1,
       n_V_cnd: isSKE ? 2 : 1, n_V_isp: 1, n_V_cmp: 1,
       PWM_spd: 2,

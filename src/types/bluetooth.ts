@@ -1,3 +1,10 @@
+// System types
+export type SystemType = 'SKA' | 'SKE';
+
+// Relay types
+export type RelayType = 'M1' | 'M2' | 'M3' | 'M4' | 'M5' | 'CMP';
+
+// Component status types
 export type ComponentStatus = 'ok' | 'error' | 'off';
 
 export interface FanStatus {
@@ -93,10 +100,8 @@ export interface DiagnosticData {
   // Timer
   timer_off: number;       // Shutdown timer
   
-  // System type
-  systemType: 'SKA' | 'SKE';  // СКА or СКЭ
-  
-  // Operation mode
+  // System configuration
+  systemType: SystemType;
   mode: 'cooling' | 'ventilation' | 'standby' | 'error';
   
   // System status

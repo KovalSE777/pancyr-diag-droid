@@ -11,6 +11,8 @@ import { Capacitor } from "@capacitor/core";
 import { BluetoothSerial } from '@/utils/native-bluetooth';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { logService } from "@/utils/log-service";
+import { BT_TIMING, BT_DEFAULT_PIN } from "@/utils/bluetooth-constants";
+import { SystemType } from "@/types/bluetooth";
 const BluetoothConnect = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -50,12 +52,12 @@ const BluetoothConnect = () => {
       toast({ title: 'Поиск устройства...', description: 'Включите Bluetooth на БСКУ' });
       setConnectionStatus('connecting');
 
-      const connected = await bluetoothService.connect(systemType.toUpperCase() as 'SKA' | 'SKE');
+      const connected = await bluetoothService.connect(systemType.toUpperCase() as SystemType);
       if (connected) {
         setConnectionStatus('connected');
         setIsConnected(true);
         toast({ title: 'Подключено успешно', description: 'Связь с БСКУ установлена' });
-        setTimeout(() => navigate(`/diagnostics?type=${systemType}`), 1200);
+        setTimeout(() => navigate(`/diagnostics?type=${systemType}`), BT_TIMING.REDIRECT_DELAY);
       } else {
         throw new Error('Не удалось подключиться к устройству');
       }
@@ -113,15 +115,15 @@ const BluetoothConnect = () => {
         throw new Error(`Неверный формат MAC-адреса: "${deviceId}". Ожидается формат XX:XX:XX:XX:XX:XX`);
       }
       
-      toast({ title: 'Подключение...', description: `MAC: ${deviceId}. Может появиться запрос PIN — введите 1234` });
+      toast({ title: 'Подключение...', description: `MAC: ${deviceId}. Может появиться запрос PIN — введите ${BT_DEFAULT_PIN}` });
 
-      const ok = await capacitorBluetoothService.connectToDeviceId(deviceId, systemType.toUpperCase() as 'SKA' | 'SKE');
+      const ok = await capacitorBluetoothService.connectToDeviceId(deviceId, systemType.toUpperCase() as SystemType);
       if (ok) {
         setConnectionStatus('connected');
         setIsConnected(true);
         setDevicePickerOpen(false);
         toast({ title: 'Подключено успешно', description: 'Связь с БСКУ установлена' });
-        setTimeout(() => navigate(`/diagnostics?type=${systemType}`), 1200);
+        setTimeout(() => navigate(`/diagnostics?type=${systemType}`), BT_TIMING.REDIRECT_DELAY);
       } else {
         throw new Error('Не удалось подключиться к выбранному устройству');
       }
@@ -295,7 +297,7 @@ const BluetoothConnect = () => {
           </DialogHeader>
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              Для некоторых модулей Android запросит PIN — введите 1234.
+              Для некоторых модулей Android запросит PIN — введите {BT_DEFAULT_PIN}.
             </p>
             <div className="max-h-60 overflow-auto border rounded-md divide-y">
               {devices.length === 0 ? (
@@ -309,8 +311,20 @@ const BluetoothConnect = () => {
                       <div className="font-medium text-sm">{d.name || 'Неизвестное устройство'}</div>
                       <div className="text-xs text-muted-foreground font-mono">{d.deviceId}</div>
                     </div>
-                    <Button size="sm" onClick={() => connectToDevice(d.deviceId)} disabled={isConnecting}>
-                      Подключить
+                    <Button 
+                      size="sm" 
+                      onClick={() => connectToDevice(d.deviceId)} 
+                      disabled={isConnecting}
+                      className="min-w-[90px]"
+                    >
+                      {isConnecting ? (
+                        <>
+                          <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                          Подключение...
+                        </>
+                      ) : (
+                        'Подключить'
+                      )}
                     </Button>
                   </div>
                 ))
