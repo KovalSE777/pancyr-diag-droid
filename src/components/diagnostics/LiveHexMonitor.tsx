@@ -2,6 +2,7 @@ import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { ArrowDownRight, ArrowUpRight } from "lucide-react";
+import { formatHex } from "@/utils/hex";
 
 export interface HexFrame {
   direction: 'TX' | 'RX';
@@ -75,7 +76,7 @@ export const LiveHexMonitor = ({ frames }: LiveHexMonitorProps) => {
                 </div>
                 
                 <div className="text-foreground break-all">
-                  {frame.hex}
+                  {formatHex(frame.hex)}
                 </div>
                 
                 {frame.description && (

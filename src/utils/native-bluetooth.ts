@@ -63,7 +63,12 @@ export class NativeBluetoothWrapper {
   async disconnect(): Promise<void> {
     try {
       await BluetoothSerial.disconnect();
+      
+      // ВАЖНО: Очищаем listeners при отключении, чтобы избежать утечек памяти
+      // При следующем подключении они будут пересозданы
       this.listenerAdded = false;
+      this.onData = undefined;
+      this.onLost = undefined;
     } catch {}
   }
 }

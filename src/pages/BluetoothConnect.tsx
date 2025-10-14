@@ -10,6 +10,7 @@ import bluetoothIcon from "@/assets/bluetooth-icon.png";
 import { Capacitor } from "@capacitor/core";
 import { BluetoothSerial } from '@/utils/native-bluetooth';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { logService } from "@/utils/log-service";
 const BluetoothConnect = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -60,10 +61,11 @@ const BluetoothConnect = () => {
       }
     } catch (error) {
       setConnectionStatus('error');
-      console.error('Connection error:', error);
+      const errorMsg = error instanceof Error ? error.message : 'Не удалось подключиться к БСКУ';
+      logService.error('BT Connect', errorMsg);
       toast({
         title: 'Ошибка подключения',
-        description: error instanceof Error ? error.message : 'Не удалось подключиться к БСКУ',
+        description: errorMsg,
         variant: 'destructive',
       });
       setIsConnecting(false);
@@ -84,9 +86,13 @@ const BluetoothConnect = () => {
       })));
       setIsScanning(false);
     } catch (e) {
-      console.error('Scan error:', e);
+      logService.error('BT Scan', `Scan failed: ${e instanceof Error ? e.message : String(e)}`);
       setIsScanning(false);
-      toast({ title: 'Ошибка сканирования', description: 'Не удалось начать сканирование', variant: 'destructive' });
+      toast({ 
+        title: 'Ошибка сканирования', 
+        description: e instanceof Error ? e.message : 'Не удалось начать сканирование', 
+        variant: 'destructive' 
+      });
     }
   };
 
@@ -120,9 +126,14 @@ const BluetoothConnect = () => {
         throw new Error('Не удалось подключиться к выбранному устройству');
       }
     } catch (e) {
-      console.error('Connect selected error:', e);
+      const errorMsg = e instanceof Error ? e.message : 'Сбой подключения';
+      logService.error('BT Connect', `Failed to connect to ${deviceId}: ${errorMsg}`);
       setConnectionStatus('error');
-      toast({ title: 'Ошибка подключения', description: e instanceof Error ? e.message : 'Сбой подключения', variant: 'destructive' });
+      toast({ 
+        title: 'Ошибка подключения', 
+        description: errorMsg, 
+        variant: 'destructive' 
+      });
     } finally {
       setIsConnecting(false);
     }

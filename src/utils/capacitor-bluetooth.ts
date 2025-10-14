@@ -4,6 +4,7 @@ import { Screen4Parser } from './screen4-parser';
 import { logService } from './log-service';
 import { HexFrame } from '@/components/diagnostics/LiveHexMonitor';
 import { NativeBluetoothWrapper } from './native-bluetooth';
+import { bytesToHex, hexToBytes, formatBytes } from './hex';
 
 export class CapacitorBluetoothService {
   private deviceAddress: string | null = null;
@@ -55,10 +56,9 @@ export class CapacitorBluetoothService {
       // 1) КРИТИЧНО: подписываемся на данные ДО connect()
       this.bt.onBytes((chunk) => {
         // Оптимизированное логирование - только в logService
-        const hexFormatted = Array.from(chunk).map(b => b.toString(16).padStart(2, '0')).join(' ').toUpperCase();
-        logService.info('BT-RX raw', `${hexFormatted} (len=${chunk.length})`);
+        logService.info('BT-RX raw', `${formatBytes(chunk)} (len=${chunk.length})`);
         
-        const hex = this.bytesToHex(chunk);
+        const hex = bytesToHex(chunk);
         this.addHexFrame('RX', hex);
         
         // Парсим фреймы
@@ -119,19 +119,7 @@ export class CapacitorBluetoothService {
   isConnected(): boolean {
     return this.deviceAddress !== null && this.connectionEstablished;
   }
-
-  private hexToBytes(hex: string): Uint8Array {
-    const cleaned = hex.replace(/\s/g, '');
-    const bytes = new Uint8Array(cleaned.length / 2);
-    for (let i = 0; i < cleaned.length; i += 2) {
-      bytes[i / 2] = parseInt(cleaned.substr(i, 2), 16);
-    }
-    return bytes;
-  }
-
-  private bytesToHex(bytes: Uint8Array | number[]): string {
-    return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
-  }
+  // Удалены дублированные методы hexToBytes/bytesToHex - используем из utils/hex.ts
 
   private handleParsedFrame(frame: ParsedFrame): void {
     const hex = [...frame.raw].map(b => b.toString(16).padStart(2, '0')).join(' ').toUpperCase();
@@ -188,7 +176,7 @@ export class CapacitorBluetoothService {
 
   private async sendRaw(bytes: Uint8Array): Promise<void> {
     if (!this.deviceAddress) throw new Error('Not connected');
-    const hex = this.bytesToHex(bytes);
+    const hex = bytesToHex(bytes);
     this.addHexFrame('TX', hex);
     await this.bt.write(bytes);
   }
@@ -204,7 +192,7 @@ export class CapacitorBluetoothService {
     const frame: HexFrame = {
       direction,
       timestamp: Date.now(),
-      hex: hex.toUpperCase().replace(/(.{2})/g, '$1 ').trim(), // Форматируем с пробелами
+      hex: hex.toUpperCase(), // Сохраняем без пробелов - форматирование в UI
       checksumOk,
       description
     };
