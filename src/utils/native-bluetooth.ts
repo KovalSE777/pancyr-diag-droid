@@ -29,6 +29,7 @@ export function fromB64(b64: string): Uint8Array {
 // Обёртка для удобства
 export class NativeBluetoothWrapper {
   private onData?: (u8: Uint8Array) => void;
+  private listenerAdded = false;
 
   async connect(mac: string): Promise<void> {
     // Проверяем формат MAC-адреса
@@ -36,8 +37,12 @@ export class NativeBluetoothWrapper {
       throw new Error(`MAC not set or invalid: "${mac}"`);
     }
     
-    // КРИТИЧНО: подписываемся ДО connect()
-    await BluetoothSerial.addListener('data', ev => this.onData?.(fromB64(ev.data)));
+    // КРИТИЧНО: подписываемся ДО connect() только один раз
+    if (!this.listenerAdded) {
+      await BluetoothSerial.addListener('data', ev => this.onData?.(fromB64(ev.data)));
+      this.listenerAdded = true;
+    }
+    
     await BluetoothSerial.connect({ mac, uuid: SPP_UUID });
   }
 
@@ -52,6 +57,7 @@ export class NativeBluetoothWrapper {
   async disconnect(): Promise<void> {
     try {
       await BluetoothSerial.disconnect();
+      this.listenerAdded = false;
     } catch {}
   }
 }

@@ -79,17 +79,23 @@ class BluetoothSerialPlugin : Plugin() {
                 val buf = ByteArray(1024)
                 while (readerRunning.get()) {
                     val n = inp?.read(buf) ?: -1
-                    if (n <= 0) break
+                    if (n <= 0) {
+                        Log.w(TAG, "Connection closed (read=$n)")
+                        break
+                    }
                     // emit 'data' СТРОГО этим именем
                     val chunk = Base64.encodeToString(buf.copyOfRange(0, n), Base64.NO_WRAP)
                     val ev = JSObject().put("data", chunk)
-                    notifyListeners("data", ev)  // <— ИМЯ СОБЫТИЯ ДОЛЖНО СОВПАДАТЬ С TS
-                    Log.d(TAG, "emit n=$n")
+                    notifyListeners("data", ev)
+                    Log.d(TAG, "RX emit n=$n bytes")
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "read loop", e)
+                Log.e(TAG, "Read loop error: ${e.message}", e)
+                // Уведомляем об обрыве соединения
+                notifyListeners("connectionLost", JSObject())
             } finally {
                 readerRunning.set(false)
+                Log.i(TAG, "Reader stopped")
             }
         }
     }

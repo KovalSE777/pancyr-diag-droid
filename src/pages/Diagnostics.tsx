@@ -114,51 +114,21 @@ const Diagnostics = () => {
       return;
     }
 
-    // Request real data from Bluetooth immediately
-    const fetchData = async () => {
-      try {
-        const reqTime = new Date().toLocaleTimeString();
+    // Для нативного плагина данные приходят автоматически через startPeriodicRead
+    // Просто опрашиваем их из сервиса каждые 2 секунды
+    const interval = setInterval(() => {
+      const liveData = service.getLatestData();
+      if (liveData) {
+        setData(liveData);
+        setIsLive(true);
         setConnectionInfo(prev => ({ 
-          ...prev, 
+          ...prev,
           connected: service.isConnected(),
-          lastRequest: reqTime,
-          requestCount: prev.requestCount + 1
+          responseCount: prev.responseCount + 1,
+          lastResponse: new Date().toLocaleTimeString()
         }));
-        
-        await service.requestDiagnosticData();
-        
-        // Wait a bit for data to arrive
-        setTimeout(() => {
-          const liveData = service.getLatestData();
-          if (liveData) {
-            const respTime = new Date().toLocaleTimeString();
-            console.log('✅ Got live data:', liveData);
-            setData(liveData);
-            setIsLive(true);
-            setConnectionInfo(prev => ({ 
-              ...prev, 
-              lastResponse: respTime,
-              responseCount: prev.responseCount + 1
-            }));
-          } else {
-            console.warn('⚠️ No live data received yet');
-          }
-        }, 2000);
-      } catch (error) {
-        console.error('Failed to request diagnostic data:', error);
-        toast({
-          title: "Ошибка запроса данных",
-          description: "Не удалось получить данные с устройства",
-          variant: "destructive"
-        });
       }
-    };
-
-    // Initial fetch
-    fetchData();
-
-    // Poll data every 3 seconds
-    const interval = setInterval(fetchData, 3000);
+    }, 2000);
 
     return () => clearInterval(interval);
   }, [useMock, systemType]);
