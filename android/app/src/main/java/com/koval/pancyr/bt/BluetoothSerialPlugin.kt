@@ -37,6 +37,7 @@ class BluetoothSerialPlugin : Plugin() {
     
     @PluginMethod
     fun connect(call: PluginCall) {
+        Log.d(TAG, "✅ connect() called! mac=" + call.getString("mac") + ", uuid=" + call.getString("uuid"))
         val mac = call.getString("mac")
         val uuidStr = call.getString("uuid")
         if (mac == null) {
@@ -102,6 +103,7 @@ class BluetoothSerialPlugin : Plugin() {
     
     @PluginMethod
     fun write(call: PluginCall) {
+        Log.d(TAG, "✅ write() called, data length=" + (call.getString("data")?.length ?: 0))
         try {
             val b64 = call.getString("data") ?: run {
                 call.reject("data base64 required")
@@ -118,6 +120,7 @@ class BluetoothSerialPlugin : Plugin() {
     
     @PluginMethod
     fun disconnect(call: PluginCall) {
+        Log.d(TAG, "✅ disconnect() called")
         try {
             readerRunning.set(false)
             inp?.close()
@@ -134,6 +137,7 @@ class BluetoothSerialPlugin : Plugin() {
     
     @PluginMethod
     fun scan(call: PluginCall) {
+        Log.d(TAG, "✅ scan() called")
         if (!hasPermission("btConnect") || !hasPermission("btScan")) {
             requestAllPermissions(object : PermissionCallback {
                 override fun onPermissionsResult(results: Array<String>) {
