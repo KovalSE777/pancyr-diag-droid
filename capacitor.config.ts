@@ -39,13 +39,6 @@ const config: CapacitorConfig = {
     cleartext: true
   },
   */
-  
-  plugins: {
-    BluetoothSerial: {
-      // Нативный плагин Bluetooth Serial для Android
-      // См. android/app/src/main/java/com/koval/pancyr/bt/BluetoothSerialPlugin.kt
-    }
-  }
 };
 
 export default config;
