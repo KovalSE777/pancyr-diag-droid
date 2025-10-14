@@ -65,6 +65,14 @@ export class CapacitorBluetoothService {
         this.parser.feed(chunk, (frame) => this.handleParsedFrame(frame));
       });
       
+      // Обработка потери соединения
+      this.bt.onConnectionLost(() => {
+        logService.error('BT Serial', 'Connection lost - device disconnected');
+        this.connectionEstablished = false;
+        this.stopTesterPresent();
+        this.stopPeriodicRead();
+      });
+      
       // 2) Подключаемся к устройству
       await this.bt.connect(mac);
       logService.success('BT Serial', 'Socket connected');
@@ -139,7 +147,9 @@ export class CapacitorBluetoothService {
         const diagnosticData = Screen4Parser.parse(frame.raw.slice(3, 3 + (frame.raw[2] & 0xFF)), this.systemType);
         if (diagnosticData) {
           this.latestData = diagnosticData;
-          logService.success('BT-RX', 'Screen 4 parsed');
+          logService.success('BT-RX', 'Screen 4 parsed successfully');
+        } else {
+          logService.error('BT-RX', 'Screen 4 parse failed - invalid payload');
         }
       }
     }

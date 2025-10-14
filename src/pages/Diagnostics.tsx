@@ -36,10 +36,12 @@ const Diagnostics = () => {
   
   const systemType = searchParams.get('type') || 'ska';
   const useMock = searchParams.get('mock') === 'true';
+  
+  // Единая точка получения сервиса
+  const isNative = Capacitor.isNativePlatform();
+  const service = isNative ? capacitorBluetoothService : bluetoothService;
 
   const handleTestModeChange = async (enabled: boolean) => {
-    const isNative = Capacitor.isNativePlatform();
-    const service = isNative ? capacitorBluetoothService : bluetoothService;
     
     if (!service.isConnected() && !useMock) {
       toast({
@@ -71,9 +73,6 @@ const Diagnostics = () => {
   };
 
   const handleRelayControl = async (relay: 'M1' | 'M2' | 'M3' | 'M4' | 'M5' | 'CMP', state: boolean) => {
-    const isNative = Capacitor.isNativePlatform();
-    const service = isNative ? capacitorBluetoothService : bluetoothService;
-    
     if (!service.isConnected() && !useMock) {
       return;
     }
@@ -94,9 +93,6 @@ const Diagnostics = () => {
   };
 
   useEffect(() => {
-    const isNative = Capacitor.isNativePlatform();
-    const service = isNative ? capacitorBluetoothService : bluetoothService;
-    
     // Setup hex frame listener for native
     if (isNative && !useMock) {
       capacitorBluetoothService.setOnFramesUpdate((frames) => {
@@ -116,22 +112,30 @@ const Diagnostics = () => {
 
     // Для нативного плагина данные приходят автоматически через startPeriodicRead
     // Просто опрашиваем их из сервиса каждые 2 секунды
-    const interval = setInterval(() => {
-      const liveData = service.getLatestData();
-      if (liveData) {
-        setData(liveData);
-        setIsLive(true);
-        setConnectionInfo(prev => ({ 
-          ...prev,
-          connected: service.isConnected(),
-          responseCount: prev.responseCount + 1,
-          lastResponse: new Date().toLocaleTimeString()
-        }));
-      }
-    }, 2000);
+    let interval: number | undefined;
+    
+    if (!useMock && service.isConnected()) {
+      interval = window.setInterval(() => {
+        const liveData = service.getLatestData();
+        if (liveData) {
+          setData(liveData);
+          setIsLive(true);
+          setConnectionInfo(prev => ({ 
+            ...prev,
+            connected: service.isConnected(),
+            responseCount: prev.responseCount + 1,
+            lastResponse: new Date().toLocaleTimeString()
+          }));
+        }
+      }, 2000);
+    }
 
-    return () => clearInterval(interval);
-  }, [useMock, systemType]);
+    return () => {
+      if (interval !== undefined) {
+        clearInterval(interval);
+      }
+    };
+  }, [useMock, systemType, service]);
 
   if (!data) {
     return (
@@ -303,7 +307,7 @@ const Diagnostics = () => {
             </div>
             <div className="p-3 sm:p-4 rounded-lg bg-background/50 text-center">
               <p className="text-[10px] sm:text-xs text-muted-foreground mb-1">Давление</p>
-              <p className="text-lg sm:text-2xl font-mono font-bold text-foreground">{((data.U_davl / 255) * 100).toFixed(0)}%</p>
+              <p className="text-lg sm:text-2xl font-mono font-bold text-foreground">{data.U_davl.toFixed(1)} bar</p>
             </div>
           </div>
         </Card>

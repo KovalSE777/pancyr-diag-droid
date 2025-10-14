@@ -5,7 +5,7 @@ export interface BluetoothSerialPlugin {
   write(opts: { data: string }): Promise<void>; // base64
   disconnect(): Promise<void>;
   scan(): Promise<{ devices: Array<{ address: string; name: string }> }>;
-  addListener(event: 'data', cb: (ev: { data: string }) => void): Promise<void>;
+  addListener(event: 'data' | 'connectionLost', cb: (ev?: any) => void): Promise<void>;
 }
 
 export const BluetoothSerial = registerPlugin<BluetoothSerialPlugin>('BluetoothSerial');
@@ -29,6 +29,7 @@ export function fromB64(b64: string): Uint8Array {
 // Обёртка для удобства
 export class NativeBluetoothWrapper {
   private onData?: (u8: Uint8Array) => void;
+  private onLost?: () => void;
   private listenerAdded = false;
 
   async connect(mac: string): Promise<void> {
@@ -40,6 +41,7 @@ export class NativeBluetoothWrapper {
     // КРИТИЧНО: подписываемся ДО connect() только один раз
     if (!this.listenerAdded) {
       await BluetoothSerial.addListener('data', ev => this.onData?.(fromB64(ev.data)));
+      await BluetoothSerial.addListener('connectionLost', () => this.onLost?.());
       this.listenerAdded = true;
     }
     
@@ -48,6 +50,10 @@ export class NativeBluetoothWrapper {
 
   onBytes(cb: (u8: Uint8Array) => void): void {
     this.onData = cb;
+  }
+
+  onConnectionLost(cb: () => void): void {
+    this.onLost = cb;
   }
 
   async write(u8: Uint8Array): Promise<void> {
