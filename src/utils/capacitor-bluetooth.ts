@@ -67,22 +67,25 @@ export class CapacitorBluetoothService {
       this.systemType = systemType;
       await this.initialize();
       
-      // Сначала подписываемся на данные, потом connect
+      // 1) Сначала подписываемся на данные
       this.deviceAddress = deviceAddress;
       this.startReading();
       
-      // Подключаемся и ждём установления соединения
+      // 2) Подключаемся к устройству
       await BluetoothSerial.connect({ address: deviceAddress });
       logService.success('BT Serial', 'Socket connected');
       
-      // Пауза 200 мс для стабилизации соединения
+      // 3) Пауза 200 мс для стабилизации соединения (как указано в документе)
       await new Promise(resolve => setTimeout(resolve, 200));
       
-      // Только ПОСЛЕ паузы отправляем первую команду
+      // 4) Только ПОСЛЕ паузы отправляем первую команду
       await this.sendStartCommunication();
       
       this.connectionEstablished = true;
+      
+      // 5) Запускаем периодические команды
       this.startTesterPresent();
+      this.startPeriodicRead();
       
       logService.success('BT Serial', 'Ready');
       return true;
@@ -100,24 +103,25 @@ export class CapacitorBluetoothService {
         const result = await BluetoothSerial.read({ address: this.deviceAddress });
         if (result.value) {
           const bytes = this.hexToBytes(result.value);
-          const hex = this.bytesToHex(bytes);
           
-          // Логируем сырые данные ДО парсинга
+          // Логируем сырые данные ДО парсинга (как просит документ)
           const hexFormatted = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join(' ').toUpperCase();
-          logService.info('BT-RX raw', hexFormatted);
+          logService.info('BT-RX raw', `${hexFormatted} (len=${bytes.length})`);
           
+          const hex = this.bytesToHex(bytes);
           this.addHexFrame('RX', hex);
           
           this.parser.feed(bytes, (frame) => this.handleParsedFrame(frame));
         }
       } catch (err) {
-        // Нет данных
+        // Нет данных - это нормально
       }
     }, 100);
   }
 
   async disconnect(): Promise<void> {
     this.stopTesterPresent();
+    this.stopPeriodicRead();
     if (this.readInterval) clearInterval(this.readInterval);
     
     if (this.deviceAddress) {
@@ -257,11 +261,26 @@ export class CapacitorBluetoothService {
       if (this.isConnected()) {
         this.sendTesterPresent().catch(() => {});
       }
-    }, 1500);
+    }, 1500); // Как указано в документе: каждые 1500 мс
   }
 
   private stopTesterPresent(): void {
     if (this.testerPresentInterval) clearInterval(this.testerPresentInterval);
+  }
+
+  private periodicReadInterval: number | null = null;
+
+  private startPeriodicRead(): void {
+    this.stopPeriodicRead();
+    this.periodicReadInterval = window.setInterval(() => {
+      if (this.isConnected()) {
+        this.requestDiagnosticData().catch(() => {});
+      }
+    }, 1000); // Как указано в документе: каждые 1000 мс
+  }
+
+  private stopPeriodicRead(): void {
+    if (this.periodicReadInterval) clearInterval(this.periodicReadInterval);
   }
 
   getLatestData(): DiagnosticData | null {
