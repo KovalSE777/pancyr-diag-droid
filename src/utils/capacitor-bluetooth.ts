@@ -34,6 +34,12 @@ export class CapacitorBluetoothService {
 
   async connectToDeviceId(deviceAddress: string, systemType: 'SKA' | 'SKE' = 'SKA'): Promise<boolean> {
     try {
+      // Валидация systemType
+      if (systemType !== 'SKA' && systemType !== 'SKE') {
+        logService.error('BT Serial', `Invalid systemType: "${systemType}"`);
+        throw new Error(`Invalid systemType: "${systemType}". Expected SKA or SKE`);
+      }
+      
       this.systemType = systemType;
       await this.initialize();
       
@@ -48,7 +54,7 @@ export class CapacitorBluetoothService {
       
       // 1) КРИТИЧНО: подписываемся на данные ДО connect()
       this.bt.onBytes((chunk) => {
-        // Сырой лог ДО парсинга
+        // Оптимизированное логирование - только в logService
         const hexFormatted = Array.from(chunk).map(b => b.toString(16).padStart(2, '0')).join(' ').toUpperCase();
         logService.info('BT-RX raw', `${hexFormatted} (len=${chunk.length})`);
         
@@ -195,9 +201,9 @@ export class CapacitorBluetoothService {
     
     this.hexFrames.push(frame);
     
-    // Храним только последние 50 кадров
-    if (this.hexFrames.length > 50) {
-      this.hexFrames = this.hexFrames.slice(-50);
+    // Храним только последние 100 кадров (увеличено с 50)
+    if (this.hexFrames.length > 100) {
+      this.hexFrames = this.hexFrames.slice(-100);
     }
     
     this.onFramesUpdate?.(this.hexFrames);

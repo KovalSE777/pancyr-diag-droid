@@ -17,6 +17,12 @@ export class Screen4Parser {
    * Индексация: payload[0] = byte[3] в полном кадре
    */
   static parse(payload: Uint8Array, systemType: 'SKA' | 'SKE' = 'SKA'): DiagnosticData | null {
+    // Валидация systemType
+    if (systemType !== 'SKA' && systemType !== 'SKE') {
+      console.error('Invalid systemType:', systemType, 'expected SKA or SKE');
+      return null;
+    }
+    
     if (payload.length < 33) {
       console.error('Screen 4 payload too short:', payload.length, 'expected 33 bytes');
       return null;
@@ -261,13 +267,15 @@ export class Screen4Parser {
       dUP_M2,
       dUP_M3,
 
-      // Температуры (пока заглушки, нужны формулы из прошивки)
-      T_air: 22.0,
-      T_isp: -5.0,
+      // Температуры (TODO: Требуются формулы конвертации из прошивки)
+      // Пока используем заглушки - нужны ADC значения и калибровочные коэффициенты
+      T_air: 22.0,   // Заглушка - нужна формула: T_air = f(ADC_value)
+      T_isp: -5.0,   // Заглушка - нужна формула: T_isp = f(ADC_value)
+      T_kmp: 45.0,   // Заглушка - нужна формула: T_kmp = f(ADC_value)
 
       // Напряжение и давление
       U_nap,
-      U_davl: 128, // Заглушка
+      U_davl: 128, // TODO: Нужна формула конвертации ADC → давление
 
       // Количество вентиляторов
       kUM1_cnd,
