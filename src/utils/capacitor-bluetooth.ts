@@ -1,9 +1,9 @@
-import { BluetoothSerial } from '@e-is/capacitor-bluetooth-serial';
 import { DiagnosticData } from '@/types/bluetooth';
 import { ProtocolParser, ParsedFrame, UDS_StartComm, UDS_TesterPres, UDS_Read21_01, ackUOKS, ackUOKP } from './protocol-parser';
 import { Screen4Parser } from './screen4-parser';
 import { logService } from './log-service';
 import { HexFrame } from '@/components/diagnostics/LiveHexMonitor';
+import { NativeBluetoothWrapper } from './native-bluetooth';
 
 export class CapacitorBluetoothService {
   private deviceAddress: string | null = null;
@@ -12,9 +12,9 @@ export class CapacitorBluetoothService {
   private parser: ProtocolParser = new ProtocolParser();
   private testerPresentInterval: number | null = null;
   private connectionEstablished: boolean = false;
-  private readInterval: number | null = null;
   private hexFrames: HexFrame[] = [];
   private onFramesUpdate?: (frames: HexFrame[]) => void;
+  private bt: NativeBluetoothWrapper = new NativeBluetoothWrapper();
   
   private readonly BSKU_ADDRESS = 0x28;
   private readonly TESTER_ADDRESS = 0xF0;
@@ -22,57 +22,37 @@ export class CapacitorBluetoothService {
   private readonly EXPECTED_SRC = 0x28;
   
   async initialize(): Promise<void> {
-    try {
-      const result = await BluetoothSerial.isEnabled();
-      if (!result.enabled) {
-        await BluetoothSerial.enable();
-      }
-      logService.success('BT Serial', 'Bluetooth enabled');
-    } catch (error) {
-      console.error('BT Serial initialization failed:', error);
-      throw error;
-    }
+    // Инициализация не требуется для нативного плагина
+    logService.success('BT Serial', 'Native Bluetooth ready');
   }
 
   async connect(systemType: 'SKA' | 'SKE' = 'SKA'): Promise<boolean> {
-    try {
-      this.systemType = systemType;
-      await this.initialize();
-      
-      const result = await BluetoothSerial.scan();
-      const devices = result.devices || [];
-      
-      if (devices.length === 0) {
-        throw new Error('Нет доступных Bluetooth устройств');
-      }
-      
-      for (const device of devices) {
-        try {
-          const success = await this.connectToDeviceId(device.address, systemType);
-          if (success) return true;
-        } catch (err) {
-          continue;
-        }
-      }
-      
-      throw new Error('Не удалось подключиться');
-    } catch (error) {
-      logService.error('BT Serial', `Connection failed: ${error}`);
-      return false;
-    }
+    // Для нативного плагина требуется MAC адрес
+    logService.error('BT Serial', 'Use connectToDeviceId with MAC address');
+    return false;
   }
 
   async connectToDeviceId(deviceAddress: string, systemType: 'SKA' | 'SKE' = 'SKA'): Promise<boolean> {
     try {
       this.systemType = systemType;
       await this.initialize();
-      
-      // 1) Сначала подписываемся на данные
       this.deviceAddress = deviceAddress;
-      this.startReading();
+      
+      // 1) КРИТИЧНО: подписываемся на данные ДО connect()
+      this.bt.onBytes((chunk) => {
+        // Сырой лог ДО парсинга
+        const hexFormatted = Array.from(chunk).map(b => b.toString(16).padStart(2, '0')).join(' ').toUpperCase();
+        logService.info('BT-RX raw', `${hexFormatted} (len=${chunk.length})`);
+        
+        const hex = this.bytesToHex(chunk);
+        this.addHexFrame('RX', hex);
+        
+        // Парсим фреймы
+        this.parser.feed(chunk, (frame) => this.handleParsedFrame(frame));
+      });
       
       // 2) Подключаемся к устройству
-      await BluetoothSerial.connect({ address: deviceAddress });
+      await this.bt.connect(deviceAddress);
       logService.success('BT Serial', 'Socket connected');
       
       // 3) Пауза 200 мс для стабилизации соединения (как указано в документе)
@@ -95,38 +75,15 @@ export class CapacitorBluetoothService {
     }
   }
 
-  private startReading(): void {
-    this.readInterval = window.setInterval(async () => {
-      if (!this.deviceAddress) return;
-      
-      try {
-        const result = await BluetoothSerial.read({ address: this.deviceAddress });
-        if (result.value) {
-          const bytes = this.hexToBytes(result.value);
-          
-          // Логируем сырые данные ДО парсинга (как просит документ)
-          const hexFormatted = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join(' ').toUpperCase();
-          logService.info('BT-RX raw', `${hexFormatted} (len=${bytes.length})`);
-          
-          const hex = this.bytesToHex(bytes);
-          this.addHexFrame('RX', hex);
-          
-          this.parser.feed(bytes, (frame) => this.handleParsedFrame(frame));
-        }
-      } catch (err) {
-        // Нет данных - это нормально
-      }
-    }, 100);
-  }
+  // Больше не нужен - данные приходят через listener нативного плагина
 
   async disconnect(): Promise<void> {
     this.stopTesterPresent();
     this.stopPeriodicRead();
-    if (this.readInterval) clearInterval(this.readInterval);
     
     if (this.deviceAddress) {
       try {
-        await BluetoothSerial.disconnect({ address: this.deviceAddress });
+        await this.bt.disconnect();
         this.deviceAddress = null;
         this.connectionEstablished = false;
         this.parser.clearBuffer();
@@ -210,7 +167,7 @@ export class CapacitorBluetoothService {
     if (!this.deviceAddress) throw new Error('Not connected');
     const hex = this.bytesToHex(bytes);
     this.addHexFrame('TX', hex);
-    await BluetoothSerial.write({ address: this.deviceAddress, value: hex });
+    await this.bt.write(bytes);
   }
 
   private async sendUDSCommand(packet: Uint8Array): Promise<void> {
