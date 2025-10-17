@@ -140,7 +140,7 @@ export class CapacitorBluetoothService {
       logService.success('BT-RX frame', `✓ UDS 0x${dst.toString(16).toUpperCase()}←0x${src.toString(16).toUpperCase()} SID=0x${sid.toString(16).toUpperCase()}, CHK=${frame.ok ? 'OK' : 'FAIL'}, ${hex}`);
       
       // Парсим ответ на ReadDataByIdentifier (0x61 = положительный ответ на 0x21)
-      if (sid === 0x61 && frame.ok && frame.raw.length >= 27) {
+      if (sid === 0x61 && frame.ok && frame.raw.length >= 28) {
         // Извлекаем payload (после заголовка: HDR[1] + DST[1] + SRC[1] + SID[1] + LocalID[1] = 5 байт)
         const payload = frame.raw.slice(5, frame.raw.length - 1); // Убираем заголовок и checksum
         

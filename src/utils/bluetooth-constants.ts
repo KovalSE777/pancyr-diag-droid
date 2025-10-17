@@ -20,12 +20,12 @@ export const BT_TIMING = {
   REDIRECT_DELAY: 1200,
 } as const;
 
-// Адреса UDS
+// Адреса UDS (согласно ТЗ v1.0 от 17.10.2025)
 export const UDS_ADDRESSES = {
-  BSKU: 0x28,      // Адрес БСКУ
-  TESTER: 0xF0,    // Адрес тестера
+  BSKU: 0x2A,          // Адрес БСКУ (обновлено с 0x28)
+  TESTER: 0xF1,        // Адрес тестера (обновлено с 0xF0)
   EXPECTED_DST: 0xF1,  // Ожидаемый адрес назначения в ответах
-  EXPECTED_SRC: 0x28,  // Ожидаемый адрес источника в ответах
+  EXPECTED_SRC: 0x2A,  // Ожидаемый адрес источника в ответах (обновлено с 0x28)
 } as const;
 
 // Лимиты хранения данных
