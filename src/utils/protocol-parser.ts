@@ -1,9 +1,10 @@
 /* Панцирь — протокол парсера для Android (BT-SPP).
- * Поддерживает кадры: 0x88 (телеметрия), 0x66 (SCR_… -> UOKS),
- * 0x77 (config chunk -> UOKP), и >=0x80 (UDS-подобные).
+ * Поддерживает кадры: 0x66 (SCR_… -> UOKS), 0x77 (config chunk -> UOKP),
+ * и >=0x80 (UDS протокол).
+ * Телеметрия передается через UDS 0x21 0x01 (22-байтовый формат).
  */
 
-export type FrameType = "TEL_88" | "SCR_66" | "CFG_77" | "UDS_80P" | "UNKNOWN";
+export type FrameType = "SCR_66" | "CFG_77" | "UDS_80P" | "UNKNOWN";
 
 export interface ParsedFrame {
   type: FrameType;
@@ -66,10 +67,7 @@ export class ProtocolParser {
       const b0 = this.acc[0];
       let need = 0;
 
-      if (b0 === 0x88) {
-        if (this.acc.length < 3) break;
-        need = 3 + (this.acc[2] & 0xFF) + 1;
-      } else if (b0 === 0x66) {
+      if (b0 === 0x66) {
         if (this.acc.length < 6) break;
         need = 6;
       } else if (b0 === 0x77) {
