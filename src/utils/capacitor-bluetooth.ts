@@ -1,5 +1,5 @@
 import { DiagnosticData, SystemType } from '@/types/bluetooth';
-import { ProtocolParser, ParsedFrame, UDS_StartComm, UDS_TesterPres, UDS_Read21_01, ackUOKS, ackUOKP } from './protocol-parser';
+import { ProtocolParser, ParsedFrame, UDS_StartDiag, UDS_StartComm, UDS_TesterPres, UDS_Read21_01, ackUOKS, ackUOKP } from './protocol-parser';
 import { Screen4Parser } from './screen4-parser';
 import { logService } from './log-service';
 import { HexFrame } from '@/components/diagnostics/LiveHexMonitor';
@@ -132,17 +132,28 @@ export class CapacitorBluetoothService {
     // Логируем все типы фреймов с детальной информацией
     logService.info('BT-RX frame', `Type=${frame.type}, CHK=${frame.ok ? 'OK' : 'FAIL'}, Info=${JSON.stringify(frame.info ?? {})}, Hex=${hex}`);
     
-    if (frame.type === 'TEL_88') {
-      const nScr = frame.info?.nScr;
-      logService.success('BT-RX frame', `✓ 0x88 Screen=${nScr}, CHK=${frame.ok ? 'OK' : 'FAIL'}, ${hex}`);
+    if (frame.type === 'UDS_80P') {
+      const dst = frame.info?.dst ?? 0;
+      const src = frame.info?.src ?? 0;
+      const sid = frame.info?.sid ?? 0;
       
-      if (nScr === 4 && frame.ok) {
-        const diagnosticData = Screen4Parser.parse(frame.raw.slice(3, 3 + (frame.raw[2] & 0xFF)), this.systemType);
-        if (diagnosticData) {
-          this.latestData = diagnosticData;
-          logService.success('BT-RX', 'Screen 4 parsed successfully');
+      logService.success('BT-RX frame', `✓ UDS 0x${dst.toString(16).toUpperCase()}←0x${src.toString(16).toUpperCase()} SID=0x${sid.toString(16).toUpperCase()}, CHK=${frame.ok ? 'OK' : 'FAIL'}, ${hex}`);
+      
+      // Парсим ответ на ReadDataByIdentifier (0x61 = положительный ответ на 0x21)
+      if (sid === 0x61 && frame.ok && frame.raw.length >= 27) {
+        // Извлекаем payload (после заголовка: HDR[1] + DST[1] + SRC[1] + SID[1] + LocalID[1] = 5 байт)
+        const payload = frame.raw.slice(5, frame.raw.length - 1); // Убираем заголовок и checksum
+        
+        if (payload.length >= 22) {
+          const diagnosticData = Screen4Parser.parse(payload, this.systemType);
+          if (diagnosticData) {
+            this.latestData = diagnosticData;
+            logService.success('BT-RX', 'UDS 0x21 payload parsed successfully');
+          } else {
+            logService.error('BT-RX', `UDS 0x21 parse failed - payload length=${payload.length}`);
+          }
         } else {
-          logService.error('BT-RX', 'Screen 4 parse failed - invalid payload');
+          logService.error('BT-RX', `UDS 0x21 payload too short: ${payload.length} bytes`);
         }
       }
     }
@@ -165,14 +176,6 @@ export class CapacitorBluetoothService {
       const ackHex = [...ack].map(b => b.toString(16).padStart(2, '0')).join(' ').toUpperCase();
       this.addHexFrame('TX', ackHex, true, `ACK UOKP${nPak}`);
       logService.info('BT-TX', `UOKP${nPak} → ${ackHex}`);
-    }
-    else if (frame.type === 'UDS_80P') {
-      const dst = frame.info?.dst ?? 0;
-      const src = frame.info?.src ?? 0;
-      const sid = frame.info?.sid ?? 0;
-      
-      // НЕ ФИЛЬТРУЕМ по DST — правильный ответ DST=EXPECTED_DST, SRC=EXPECTED_SRC
-      logService.success('BT-RX frame', `✓ UDS 0x${dst.toString(16).toUpperCase()}←0x${src.toString(16).toUpperCase()} SID=0x${sid.toString(16).toUpperCase()}, CHK=${frame.ok ? 'OK' : 'FAIL'}, ${hex}`);
     }
     else if (!frame.ok) {
       logService.error('BT-RX frame', `✗ Checksum FAIL: ${hex}`);
@@ -221,6 +224,9 @@ export class CapacitorBluetoothService {
   }
 
   private async sendStartCommunication(): Promise<void> {
+    // Согласно схемам обмена: сначала StartDiagnosticSession, затем StartCommunication
+    await this.sendUDSCommand(UDS_StartDiag);
+    await new Promise(resolve => setTimeout(resolve, 200)); // Пауза между командами
     await this.sendUDSCommand(UDS_StartComm);
   }
 

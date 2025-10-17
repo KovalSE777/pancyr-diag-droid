@@ -47,20 +47,13 @@ const adc8ToTempB = (adc: number): number => interp8(adc & 0xFF, TEMP_TABLE_B) /
 const adc8ToPressureBar = (adc: number): number => interp8(adc & 0xFF, PRESS_TABLE) / 10;
 
 /**
- * Парсер данных экрана 4 (33 байта payload)
- * Согласно документу "Главное.docx" §3.1
+ * Парсер данных экрана 4 (22 байта payload - НОВЫЙ ФОРМАТ v1.0)
+ * Согласно ТЗ от 17.10.2025
  */
 export class Screen4Parser {
   /**
-   * Читает U16 в little-endian формате
-   */
-  private static readU16LE(bytes: Uint8Array, offset: number): number {
-    return bytes[offset] | (bytes[offset + 1] << 8);
-  }
-
-  /**
-   * Парсит payload экрана 4 (33 байта)
-   * Индексация: payload[0] = byte[3] в полном кадре
+   * Парсит payload UDS ответа 0x21 0x01 (22 байта базовый формат)
+   * Поддерживает расширенный формат до 33 байт (опционально)
    */
   static parse(payload: Uint8Array, systemType: 'SKA' | 'SKE' = 'SKA'): DiagnosticData | null {
     // Валидация systemType
@@ -69,163 +62,144 @@ export class Screen4Parser {
       return null;
     }
     
-    if (payload.length < 33) {
-      logService.error('Screen4Parser', `Payload too short: ${payload.length} bytes, expected 33`);
+    // Минимум 22 байта обязательных данных
+    if (payload.length < 22) {
+      logService.error('Screen4Parser', `Payload too short: ${payload.length} bytes, expected minimum 22`);
       return null;
     }
+
+    // ========== ОБЯЗАТЕЛЬНЫЕ 22 БАЙТА (согласно ТЗ v1.0) ==========
     
-    // Проверка валидности критичных индексов
-    const requiredIndices = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32];
-    for (const idx of requiredIndices) {
-      if (payload[idx] === undefined) {
-        logService.error('Screen4Parser', `Payload invalid at index ${idx}`);
-        return null;
-      }
+    // [0] U_U_UM1 - ADC напряжения вентилятора М1
+    const U_U_UM1 = payload[0] & 0xFF;
+    
+    // [1] U_U_UM2 - ADC напряжения вентилятора М2
+    const U_U_UM2 = payload[1] & 0xFF;
+    
+    // [2] U_U_UM3 - ADC напряжения вентилятора М3
+    const U_U_UM3 = payload[2] & 0xFF;
+    
+    // [3] U_U_FU - ADC напряжения питания
+    const U_U_FU = payload[3] & 0xFF;
+    
+    // [4] uUPR_BT - битовая маска управления
+    const uUPR_BT = payload[4] & 0xFF;
+    
+    // [5] uUPR_IND - битовая маска индикации (предохранители)
+    const uUPR_IND = payload[5] & 0xFF;
+    
+    // [6] sDAT_BIT - битовая маска состояний
+    const sDAT_BIT = payload[6] & 0xFF;
+    
+    // [7] work_rej_cmp - режим работы компрессора
+    const work_rej_cmp = payload[7] & 0xFF;
+    
+    // [8] vdlt_cnd_i - падение напряжения конденсатор
+    const vdlt_cnd_i = payload[8] & 0xFF;
+    
+    // [9] vdlt_isp_i - падение напряжения испаритель
+    const vdlt_isp_i = payload[9] & 0xFF;
+    
+    // [10] vdlt_cmp_i - падение напряжения компрессор
+    const vdlt_cmp_i = payload[10] & 0xFF;
+    
+    // [11] timer_off - таймер отключения
+    const timer_off = payload[11] & 0xFF;
+    
+    // [12] rej_cnd - режим работы конденсатор
+    const rej_cnd = payload[12] & 0xFF;
+    
+    // [13] rej_isp - режим работы испаритель
+    const rej_isp = payload[13] & 0xFF;
+    
+    // [14] edlt_cnd - заданное падение конденсатор
+    const edlt_cnd = payload[14] & 0xFF;
+    
+    // [15] edlt_isp - заданное падение испаритель
+    const edlt_isp = payload[15] & 0xFF;
+    
+    // [16] edlt_cmp - заданное падение компрессор
+    const edlt_cmp = payload[16] & 0xFF;
+    
+    // [17] n_V_cnd - количество активных вентиляторов конденсатора
+    const n_V_cnd = payload[17] & 0xFF;
+    
+    // [18] PWM_spd - скорость PWM (1=медленно, 2=быстро)
+    const PWM_spd = payload[18] & 0xFF;
+    
+    // [19] s1_TMR2 - HIGH период PWM
+    const s1_TMR2 = payload[19] & 0xFF;
+    
+    // [20] s0_TMR2 - LOW период PWM
+    const s0_TMR2 = payload[20] & 0xFF;
+    
+    // [21] t_v_razg_cnd - время разгона конденсатора
+    const t_v_razg_cnd = payload[21] & 0xFF;
+
+    // ========== РАСШИРЕННЫЕ ПОЛЯ (опционально, байты 22+) ==========
+    
+    let T_air_adc = 0x6A;  // Дефолтные значения
+    let T_isp_adc = 0x30;
+    let T_kmp_adc = 0x40;
+    let U_davl_adc = 107;
+    
+    // Если есть расширенные данные (температуры и давление)
+    if (payload.length >= 25) {
+      T_air_adc = payload[22] & 0xFF;   // [22] T_air
+      T_isp_adc = payload[23] & 0xFF;   // [23] T_isp
+      U_davl_adc = payload[24] & 0xFF;  // [24] U_davl
+      T_kmp_adc = payload.length >= 27 ? payload[26] & 0xFF : 0x40; // [26] T_kmp (если есть)
     }
 
-    // [0-6] - маски отображения (пропускаем, используются прошивкой для UI)
-    // [7] = sim2 - битовое поле
-    const sim2 = payload[7];
+    // ========== КОНВЕРТАЦИЯ ДАННЫХ ==========
     
-    // [8] = sim3 - битовое поле  
-    const sim3 = payload[8];
+    // Напряжения (формула из ТЗ: V = ADC * 30 / 255)
+    const UP_M1 = (U_U_UM1 * 30) / 255;
+    const UP_M2 = (U_U_UM2 * 30) / 255;
+    const UP_M3 = (U_U_UM3 * 30) / 255;
+    const U_nap = (U_U_FU * 30) / 255;
     
-    // [9-10] - U_U_FU + 100 (u16, little-endian)
-    const U_U_FU = this.readU16LE(payload, 9) - 100;
-    
-    // [11-12] - U_U_UM1 + 100 (u16, LE)
-    const U_U_UM1 = this.readU16LE(payload, 11) - 100;
-    
-    // [13-14] - U_U_UM2 + 100 (u16, LE)
-    const U_U_UM2 = this.readU16LE(payload, 13) - 100;
-    
-    // [15-16] - U_U_UM3 + 100 (u16, LE)
-    const U_U_UM3 = this.readU16LE(payload, 15) - 100;
-    
-    // [17] - vdlt_cnd_i (падение напряжения конденсатора)
-    const vdlt_cnd_i = payload[17];
-    
-    // [18] - vdlt_isp_i (падение напряжения испарителя)
-    const vdlt_isp_i = payload[18];
-    
-    // [19] - vdlt_cmp_i (падение напряжения компрессора)
-    const vdlt_cmp_i = payload[19];
-    
-    // [20] - edlt_cnd_i (заданное падение конденсатора)
-    const edlt_cnd_i = payload[20];
-    
-    // [21] - edlt_isp_i (заданное падение испарителя)
-    const edlt_isp_i = payload[21];
-    
-    // [22] - edlt_cmp_i (заданное падение компрессора)
-    const edlt_cmp_i = payload[22];
-    
-    // [23] - cikl_COM (счётчик циклов BT)
-    const cikl_COM = payload[23];
-    
-    // [24] - cikl_K_line (счётчик циклов K-Line)
-    const cikl_K_line = payload[24];
-    
-    // [25] - timer_off (таймер отключения)
-    const timer_off = payload[25];
-    
-    // [26] - n_V_cnd (активные вентиляторы конденсатора)
-    const n_V_cnd = payload[26];
-    
-    // [27] - PWM_spd (скорость PWM: 1=медленно, 2=быстро)
-    const PWM_spd = payload[27] as 1 | 2;
-    
-    // [28] - s1_TMR2 (длительность высокого уровня ШИМ)
-    const s1_TMR2 = payload[28];
-    
-    // [29] - s0_TMR2 (длительность низкого уровня ШИМ)
-    const s0_TMR2 = payload[29];
-    
-    // [30] - work_rej_cnd (режим работы конденсатора)
-    const work_rej_cnd = payload[30];
-    
-    // [31] - work_rej_isp (режим работы испарителя)
-    const work_rej_isp = payload[31];
-    
-    // [32] - work_rej_cmp (режим работы компрессора)
-    const work_rej_cmp = payload[32];
+    // Падения напряжения (аналогичная формула)
+    const dUP_M1 = (vdlt_cnd_i * 30) / 255;
+    const dUP_M2 = (vdlt_isp_i * 30) / 255;
+    const dUP_M3 = (vdlt_cmp_i * 30) / 255;
 
-    // Декодирование sim2 - битовое поле статусов
-    // bit1 ← sDAT_BIT & 0x02
-    // bit2 ← sDAT_BIT & 0x04
-    // bit3 ← sDAT_BIT & 0x20
-    // bit4 ← sDAT_BIT & 0x08
-    // bit5 ← sDAT_BIT & 0x10
-    // bit6 ← uUPR_IND & 0x01
-    // bit7 ← uUPR_IND & 0x02
+    // Температуры (калибровочные таблицы)
+    const T_air = adc8ToTempA(T_air_adc);
+    const T_isp = adc8ToTempA(T_isp_adc);
+    const T_kmp = adc8ToTempB(T_kmp_adc);
     
-    // Восстанавливаем sDAT_BIT из sim2
-    let sDAT_BIT = 0;
-    if (sim2 & 0x02) sDAT_BIT |= 0x02; // bit1
-    if (sim2 & 0x04) sDAT_BIT |= 0x04; // bit2
-    if (sim2 & 0x20) sDAT_BIT |= 0x20; // bit3
-    if (sim2 & 0x08) sDAT_BIT |= 0x08; // bit4
-    if (sim2 & 0x10) sDAT_BIT |= 0x10; // bit5
-    
-    // Восстанавливаем uUPR_IND частично из sim2 и sim3
-    let uUPR_IND = 0;
-    if (sim2 & 0x40) uUPR_IND |= 0x01; // bit6 → uUPR_IND bit0
-    if (sim2 & 0x80) uUPR_IND |= 0x02; // bit7 → uUPR_IND bit1
-    
-    // Декодирование sim3 - битовое поле управления
-    // bit0 ← uUPR_IND & 0x04
-    // bit1 ← uUPR_IND & 0x08
-    // bit2 ← uUPR_BT & 0x01
-    // bit3 ← uUPR_BT & 0x02
-    // bit4 ← uUPR_BT & 0x04
-    // bit5 ← uUPR_BT & 0x08
-    // bit6 ← uUPR_BT & 0x10
-    // bit7 ← uUPR_BT & 0x40
-    
-    if (sim3 & 0x01) uUPR_IND |= 0x04; // bit0 → uUPR_IND bit2
-    if (sim3 & 0x02) uUPR_IND |= 0x08; // bit1 → uUPR_IND bit3
-    
-    // Восстанавливаем uUPR_BT из sim3
-    let uUPR_BT = 0;
-    if (sim3 & 0x04) uUPR_BT |= 0x01; // bit2
-    if (sim3 & 0x08) uUPR_BT |= 0x02; // bit3
-    if (sim3 & 0x10) uUPR_BT |= 0x04; // bit4
-    if (sim3 & 0x20) uUPR_BT |= 0x08; // bit5
-    if (sim3 & 0x40) uUPR_BT |= 0x10; // bit6
-    if (sim3 & 0x80) uUPR_BT |= 0x40; // bit7
+    // Давление
+    const U_davl = adc8ToPressureBar(U_davl_adc);
 
-    // Парсинг статусных битов sDAT_BIT
-    const bD_DAVL = !!(sDAT_BIT & 0x01);   // Датчик давления
-    const bVKL_CMP = !!(sDAT_BIT & 0x02);  // Компрессор включен
-    const bBL_2 = !!(sDAT_BIT & 0x04);     // Тип системы
-    const bK_NORM = !!(sDAT_BIT & 0x08);   // Норма конденсатора
-    const bFTD_NORM = !!(sDAT_BIT & 0x10); // Норма фотодатчика
+    // ========== БИТОВЫЕ ПОЛЯ ==========
     
-    // Парсинг предохранителей из uUPR_IND
-    const fuseEtalon = !!(uUPR_IND & 0x01);
-    const fuseCondenser = !!(uUPR_IND & 0x02);
-    const fuseEvaporator = !!(uUPR_IND & 0x04);
-    const fuseCompressor = !!(uUPR_IND & 0x08);
-    
-    // Парсинг управления реле из uUPR_BT
-    const uUP_M1 = !!(uUPR_BT & 0x01);
-    const uUP_M2 = !!(uUPR_BT & 0x02);
-    const uUP_M3 = !!(uUPR_BT & 0x04);
-    const uUP_M4 = !!(uUPR_BT & 0x08);
-    const uUP_M5 = !!(uUPR_BT & 0x10);
-    const uUP_CMP = !!(uUPR_BT & 0x20);
+    // uUPR_BT (байт 4) - управление реле
+    const uUP_M1 = !!(uUPR_BT & 0x01);   // bit 0
+    const uUP_M2 = !!(uUPR_BT & 0x02);   // bit 1
+    const uUP_M3 = !!(uUPR_BT & 0x04);   // bit 2
+    const uUP_M4 = !!(uUPR_BT & 0x08);   // bit 3
+    const uUP_M5 = !!(uUPR_BT & 0x10);   // bit 4
+    const uUP_CMP = !!(uUPR_BT & 0x20);  // bit 5
 
-    // Преобразование напряжений (простое масштабирование)
-    const UP_M1 = U_U_UM1 * 0.12; // Примерный коэффициент
-    const UP_M2 = U_U_UM2 * 0.12;
-    const UP_M3 = U_U_UM3 * 0.12;
-    const U_nap = U_U_FU * 0.12;
-    
-    const dUP_M1 = vdlt_cnd_i * 0.05;
-    const dUP_M2 = vdlt_isp_i * 0.05;
-    const dUP_M3 = vdlt_cmp_i * 0.05;
+    // uUPR_IND (байт 5) - предохранители
+    const fuseEtalon = !!(uUPR_IND & 0x01);     // bit 0
+    const fuseCondenser = !!(uUPR_IND & 0x02);  // bit 1
+    const fuseEvaporator = !!(uUPR_IND & 0x04); // bit 2
+    const fuseCompressor = !!(uUPR_IND & 0x08); // bit 3
 
-    // Определение количества вентиляторов по типу системы
+    // sDAT_BIT (байт 6) - состояния
+    const bD_DAVL = !!(sDAT_BIT & 0x01);     // bit 0 - датчик давления
+    const bVKL_CMP = !!(sDAT_BIT & 0x02);    // bit 1 - компрессор включен
+    const bBL_2 = !!(sDAT_BIT & 0x04);       // bit 2 - тип системы (0=СКА, 1=СКЭ)
+    const bK_NORM = !!(sDAT_BIT & 0x08);     // bit 3 - контактор норма
+    const bFTD_NORM = !!(sDAT_BIT & 0x10);   // bit 4 - ФТД норма
+    const bBL2_1vnt = !!(sDAT_BIT & 0x20);   // bit 5 - один вентилятор
+    const bNO_V_CMP = !!(sDAT_BIT & 0x40);   // bit 6 - нет вращения компрессора
+
+    // ========== ФОРМИРОВАНИЕ РЕЗУЛЬТАТА ==========
+    
+    // Количество вентиляторов по типу системы
     const kUM1_cnd = systemType === 'SKE' ? 3 : 2;
     const kUM2_isp = 1;
     const kUM3_cmp = 1;
@@ -248,29 +222,31 @@ export class Screen4Parser {
 
     const compressorFans = [{
       id: 1,
-      status: 'ok' as ComponentStatus
+      status: bNO_V_CMP ? 'error' as ComponentStatus : 'ok' as ComponentStatus,
+      errorMessage: bNO_V_CMP ? 'Компрессор не вращается' : undefined,
+      repairHint: bNO_V_CMP ? 'Проверьте компрессор и его подключение.' : undefined
     }];
 
-    // Определение статусов компонентов
+    // Статусы компонентов
     const compressorStatus: ComponentStatus = work_rej_cmp === 0 ? 'off' : 
-                                               work_rej_cmp === 10 ? 'error' : 'ok';
-    const condenserStatus: ComponentStatus = work_rej_cnd === 0 ? 'off' :
-                                              work_rej_cnd === 10 ? 'error' : 'ok';
-    const evaporatorStatus: ComponentStatus = work_rej_isp === 0 ? 'off' :
-                                               work_rej_isp === 10 ? 'error' : 'ok';
+                                              work_rej_cmp === 10 ? 'error' : 'ok';
+    const condenserStatus: ComponentStatus = rej_cnd === 0 ? 'off' :
+                                             rej_cnd === 10 ? 'error' : 'ok';
+    const evaporatorStatus: ComponentStatus = rej_isp === 0 ? 'off' :
+                                              rej_isp === 10 ? 'error' : 'ok';
     const pressureSensorStatus: ComponentStatus = bD_DAVL ? 'ok' : 'error';
 
-    // Определение режима работы
+    // Режим работы
     let mode: 'cooling' | 'ventilation' | 'standby' | 'error' = 'standby';
-    if (work_rej_cmp === 2 && work_rej_cnd === 2) {
+    if (work_rej_cmp === 2 && rej_cnd === 2) {
       mode = 'cooling';
-    } else if (work_rej_cmp === 0 && work_rej_cnd > 0) {
+    } else if (work_rej_cmp === 0 && rej_cnd > 0) {
       mode = 'ventilation';
-    } else if (work_rej_cmp === 10 || work_rej_cnd === 10) {
+    } else if (work_rej_cmp === 10 || rej_cnd === 10) {
       mode = 'error';
     }
 
-    // Формирование массива ошибок
+    // Формирование ошибок
     const errors = [];
     if (!fuseEtalon) {
       errors.push({
@@ -308,6 +284,17 @@ export class Screen4Parser {
         suggestedFix: 'Замените предохранитель Pr4.'
       });
     }
+    if (bNO_V_CMP) {
+      errors.push({
+        code: 'E01',
+        severity: 'critical' as const,
+        component: 'Компрессор',
+        description: 'Компрессор не вращается',
+        suggestedFix: 'Проверьте компрессор и его питание.'
+      });
+    }
+
+    logService.success('Screen4Parser', `Parsed 22-byte format: U=${U_nap.toFixed(1)}V, T_air=${T_air.toFixed(1)}°C, mode=${mode}`);
 
     return {
       // Напряжения
@@ -322,15 +309,14 @@ export class Screen4Parser {
       dUP_M2,
       dUP_M3,
 
-      // Температуры (используем калибровочные таблицы из прошивки)
-      // ADC bytes: 24=T_air, 25=T_isp, 26=T_kmp
-      T_air: adc8ToTempA(payload[24]),  // Воздух - таблица A
-      T_isp: adc8ToTempA(payload[25]),  // Испаритель - таблица A
-      T_kmp: adc8ToTempB(payload[26]),  // Компрессор - таблица B
+      // Температуры
+      T_air,
+      T_isp,
+      T_kmp,
 
       // Напряжение и давление
       U_nap,
-      U_davl: adc8ToPressureBar(payload[23]), // Давление в барах
+      U_davl,
 
       // Количество вентиляторов
       kUM1_cnd,
@@ -343,7 +329,7 @@ export class Screen4Parser {
       n_V_cmp: 1,
 
       // PWM
-      PWM_spd,
+      PWM_spd: PWM_spd as 1 | 2,
 
       // Детальные статусы вентиляторов
       condenserFans,
@@ -356,24 +342,24 @@ export class Screen4Parser {
       evaporatorStatus,
       pressureSensorStatus,
       
-      // Power system (на основе напряжения питания)
+      // Power system
       powerStatus: U_nap >= 22 && U_nap <= 30 ? 'ok' : 'error',
       batteryVoltage: U_nap,
       powerSupplyOk: U_nap >= 22 && U_nap <= 30,
       
-      softStartStatus: 'ok',
+      softStartStatus: bK_NORM && bFTD_NORM ? 'ok' : 'error',
 
-      // Диагностика (заглушки)
+      // Диагностика soft-start
       zmk_V_isp1: false,
       obr_V_isp1: false,
       zmk_V_knd1: false,
       obr_V_knd1: n_V_cnd < kUM1_cnd,
       zmk_COMP: false,
-      obr_COMP: false,
+      obr_COMP: bNO_V_CMP,
 
       // Режимы работы
-      work_rej_cnd,
-      work_rej_isp,
+      work_rej_cnd: rej_cnd,
+      work_rej_isp: rej_isp,
       work_rej_cmp,
 
       // Предохранители
@@ -387,14 +373,14 @@ export class Screen4Parser {
       signal_ContactNorm: bK_NORM,
 
       // Дополнительные данные
-      cikl_COM,
-      cikl_K_line,
+      cikl_COM: 0,  // Не передается в новом формате
+      cikl_K_line: 0,  // Не передается в новом формате
       timer_off,
       s1_TMR2,
       s0_TMR2,
-      edlt_cnd_i,
-      edlt_isp_i,
-      edlt_cmp_i,
+      edlt_cnd_i: edlt_cnd,
+      edlt_isp_i: edlt_isp,
+      edlt_cmp_i: edlt_cmp,
 
       // Тип системы и режим
       systemType,

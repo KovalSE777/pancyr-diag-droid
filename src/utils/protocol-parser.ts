@@ -21,7 +21,7 @@ export function sum8(a: Uint8Array, n?: number): number {
   return s;
 }
 
-export function buildUDS(dst = 0x28, src = 0xF0, sid: number, data: number[] = []): Uint8Array {
+export function buildUDS(dst = 0x2A, src = 0xF1, sid: number, data: number[] = []): Uint8Array {
   // Валидация входных параметров
   if (dst < 0 || dst > 255) throw new Error(`Invalid dst address: ${dst}. Must be 0-255`);
   if (src < 0 || src > 255) throw new Error(`Invalid src address: ${src}. Must be 0-255`);
@@ -42,10 +42,11 @@ export function buildUDS(dst = 0x28, src = 0xF0, sid: number, data: number[] = [
   return Uint8Array.from([...noChk, chk]);
 }
 
-// Быстрые запросы (как в логах)
-export const UDS_StartComm = buildUDS(0x28, 0xF0, 0x81);
-export const UDS_TesterPres = buildUDS(0x28, 0xF0, 0x3E, [0x01]); // 83 28 F0 3E 01 DA
-export const UDS_Read21_01 = buildUDS(0x28, 0xF0, 0x21, [0x01]); // 83 28 F0 21 01 BD
+// Быстрые запросы (согласно ТЗ v1.0 - адреса 0x2A/0xF1)
+export const UDS_StartDiag = buildUDS(0x2A, 0xF1, 0x10, [0x01]); // StartDiagnosticSession
+export const UDS_StartComm = buildUDS(0x2A, 0xF1, 0x81); // StartCommunication
+export const UDS_TesterPres = buildUDS(0x2A, 0xF1, 0x3E, [0x01]); // TesterPresent
+export const UDS_Read21_01 = buildUDS(0x2A, 0xF1, 0x21, [0x01]); // ReadDataByIdentifier
 
 // ACK (ASCII, без CHK)
 export const ackUOKS = (n: number) => enc.encode(`UOKS${String.fromCharCode(n & 0xFF)}`);
@@ -98,9 +99,7 @@ export class ProtocolParser {
         }
       }
 
-      if (frame[0] === 0x88) {
-        emit({ type: "TEL_88", raw: frame, ok, info: parseTelemetry88(frame) });
-      } else if (frame[0] === 0x66) {
+      if (frame[0] === 0x66) {
         const n = frame[5] & 0xFF;
         emit({ type: "SCR_66", raw: frame, ok: true, info: { nScr: n } });
       } else if (frame[0] === 0x77) {
@@ -121,41 +120,4 @@ export class ProtocolParser {
   clearBuffer(): void {
     this.acc = new Uint8Array(0);
   }
-}
-
-// ===== TEL 0x88 (экран 4) =====
-function u16le(a: Uint8Array, i: number) {
-  return (a[i] & 0xFF) | ((a[i + 1] & 0xFF) << 8);
-}
-
-export function parseTelemetry88(f: Uint8Array) {
-  const nScr = f[1] & 0xFF;
-  const len = f[2] & 0xFF;
-  const p = f.slice(3, 3 + len);
-
-  const sim2 = p[10] & 0xFF;  // битовые статусы
-  const sim3 = p[11] & 0xFF;
-
-  const U_U_FU = u16le(p, 12) - 100;
-  const U_U_UM1 = u16le(p, 14) - 100;
-  const U_U_UM2 = u16le(p, 16) - 100;
-  const U_U_UM3 = u16le(p, 18) - 100;
-
-  const cikl_COM = p[26] & 0xFF;
-  const cikl_Kline = p[27] & 0xFF;
-  const PWM_spd = p[30] & 0xFF;
-
-  return {
-    nScr,
-    len,
-    sim2,
-    sim3,
-    U_U_FU,
-    U_U_UM1,
-    U_U_UM2,
-    U_U_UM3,
-    cikl_COM,
-    cikl_Kline,
-    PWM_spd
-  };
 }
