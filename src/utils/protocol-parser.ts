@@ -43,11 +43,45 @@ export function buildUDS(dst = 0x2A, src = 0xF1, sid: number, data: number[] = [
   return Uint8Array.from([...noChk, chk]);
 }
 
-// Быстрые запросы (согласно ТЗ v1.0 - адреса 0x2A/0xF1)
-export const UDS_StartDiag = buildUDS(0x2A, 0xF1, 0x10, [0x01]); // StartDiagnosticSession
-export const UDS_StartComm = buildUDS(0x2A, 0xF1, 0x81); // StartCommunication
-export const UDS_TesterPres = buildUDS(0x2A, 0xF1, 0x3E, [0x01]); // TesterPresent
-export const UDS_Read21_01 = buildUDS(0x2A, 0xF1, 0x21, [0x01]); // ReadDataByIdentifier
+/**
+ * ПРЯМОЕ УПРАВЛЕНИЕ (НЕ UDS!)
+ * Устройство НЕ использует UDS протокол, а ожидает прямые данные управления.
+ * Формат: [HDR, DST=0x2A, SRC=0xF1, iUPR_BT, iUPR_IND, iDAT_BIT, dlt_paus, CHK]
+ */
+export function buildDirectControl(
+  iUPR_BT: number,    // Управление реле (M1-M5, CMP): bit0=M1, bit1=M2, bit2=M3, bit3=M4, bit4=M5, bit5=CMP
+  iUPR_IND: number,   // Управление индикаторами
+  iDAT_BIT: number,   // Битовые флаги состояния
+  dlt_paus: number    // Задержка паузы (0-255)
+): Uint8Array {
+  const body = Uint8Array.from([
+    0x2A,      // DST (БСКУ)
+    0xF1,      // SRC (приложение/тестер)
+    iUPR_BT,   // Байт управления реле
+    iUPR_IND,  // Байт управления индикаторами
+    iDAT_BIT,  // Байт флагов
+    dlt_paus   // Задержка
+  ]);
+  
+  const B = body.length + 1; // +CHK
+  const hdr = 0x80 | ((B - 2) & 0x3F);
+  const noChk = Uint8Array.from([hdr, ...body]);
+  const chk = sum8(noChk);
+  
+  return Uint8Array.from([...noChk, chk]);
+}
+
+// Пакет опроса состояния (все управляющие байты = 0x00)
+// Устройство ответит пакетом с телеметрией (22 байта)
+export const DirectControl_Poll = buildDirectControl(0x00, 0x00, 0x00, 0x00);
+
+// ========== УСТАРЕВШИЕ UDS КОМАНДЫ (НЕ ИСПОЛЬЗУЮТСЯ УСТРОЙСТВОМ) ==========
+// Оставлены для совместимости, но устройство их НЕ обрабатывает!
+// Используйте DirectControl_Poll вместо этого.
+export const UDS_StartDiag = buildUDS(0x2A, 0xF1, 0x10, [0x01]); // УСТАРЕЛО
+export const UDS_StartComm = buildUDS(0x2A, 0xF1, 0x81); // УСТАРЕЛО
+export const UDS_TesterPres = buildUDS(0x2A, 0xF1, 0x3E, [0x01]); // УСТАРЕЛО
+export const UDS_Read21_01 = buildUDS(0x2A, 0xF1, 0x21, [0x01]); // УСТАРЕЛО
 
 // ACK (ASCII, без CHK)
 export const ackUOKS = (n: number) => enc.encode(`UOKS${String.fromCharCode(n & 0xFF)}`);

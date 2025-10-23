@@ -1,5 +1,5 @@
 import { DiagnosticData, SystemType } from '@/types/bluetooth';
-import { ProtocolParser, ParsedFrame, UDS_StartDiag, UDS_StartComm, UDS_TesterPres, UDS_Read21_01, ackUOKS, ackUOKP } from './protocol-parser';
+import { ProtocolParser, ParsedFrame, DirectControl_Poll, ackUOKS, ackUOKP } from './protocol-parser';
 import { Screen4Parser } from './screen4-parser';
 import { logService } from './log-service';
 import { HexFrame } from '@/components/diagnostics/LiveHexMonitor';
@@ -65,7 +65,6 @@ export class CapacitorBluetoothService {
       this.bt.onConnectionLost(() => {
         logService.error('BT Serial', 'Connection lost - device disconnected');
         this.connectionEstablished = false;
-        this.stopTesterPresent();
         this.stopPeriodicRead();
       });
       
@@ -76,13 +75,13 @@ export class CapacitorBluetoothService {
       // 3) Пауза для стабилизации соединения (как указано в документе)
       await new Promise(resolve => setTimeout(resolve, BT_TIMING.CONNECTION_STABILIZATION_DELAY));
       
-      // 4) Только ПОСЛЕ паузы отправляем первую команду
-      await this.sendStartCommunication();
+      // 4) Отправляем первый пакет опроса (ПРЯМОЕ УПРАВЛЕНИЕ, НЕ UDS!)
+      // Устройство СРАЗУ ответит телеметрией (22 байта)
+      await this.sendDirectControlPoll();
       
       this.connectionEstablished = true;
       
-      // 5) Запускаем периодические команды
-      this.startTesterPresent();
+      // 5) Запускаем периодический опрос состояния
       this.startPeriodicRead();
       
       logService.success('BT Serial', 'Ready');
@@ -96,7 +95,6 @@ export class CapacitorBluetoothService {
   // Больше не нужен - данные приходят через listener нативного плагина
 
   async disconnect(): Promise<void> {
-    this.stopTesterPresent();
     this.stopPeriodicRead();
     
     if (this.deviceAddress) {
@@ -223,28 +221,15 @@ export class CapacitorBluetoothService {
     return this.hexFrames;
   }
 
-  private async sendStartCommunication(): Promise<void> {
-    // Согласно схемам обмена: сначала StartDiagnosticSession, затем StartCommunication
-    await this.sendUDSCommand(UDS_StartDiag);
-    await new Promise(resolve => setTimeout(resolve, 200)); // Пауза между командами
-    await this.sendUDSCommand(UDS_StartComm);
-  }
-
-  private async sendTesterPresent(): Promise<void> {
-    await this.sendUDSCommand(UDS_TesterPres);
-  }
-
-  private startTesterPresent(): void {
-    this.stopTesterPresent();
-    this.testerPresentInterval = window.setInterval(() => {
-      if (this.isConnected()) {
-        this.sendTesterPresent().catch(() => {});
-      }
-    }, BT_TIMING.TESTER_PRESENT_INTERVAL);
-  }
-
-  private stopTesterPresent(): void {
-    if (this.testerPresentInterval) clearInterval(this.testerPresentInterval);
+  /**
+   * ПРЯМОЕ УПРАВЛЕНИЕ (НЕ UDS!)
+   * Отправляем пакет опроса состояния с нулевыми управляющими байтами.
+   * Устройство СРАЗУ ответит телеметрией (22 байта).
+   */
+  private async sendDirectControlPoll(): Promise<void> {
+    const hex = Array.from(DirectControl_Poll).map(b => b.toString(16).padStart(2, '0')).join(' ').toUpperCase();
+    logService.info('BT-TX', `DirectControl Poll → ${hex}`);
+    await this.sendRaw(DirectControl_Poll);
   }
 
   private periodicReadInterval: number | null = null;
@@ -253,7 +238,8 @@ export class CapacitorBluetoothService {
     this.stopPeriodicRead();
     this.periodicReadInterval = window.setInterval(() => {
       if (this.isConnected()) {
-        this.requestDiagnosticData().catch(() => {});
+        // Периодический опрос через DirectControl (НЕ UDS!)
+        this.sendDirectControlPoll().catch(() => {});
       }
     }, BT_TIMING.PERIODIC_READ_INTERVAL);
   }
@@ -267,7 +253,8 @@ export class CapacitorBluetoothService {
   }
 
   async requestDiagnosticData(): Promise<void> {
-    await this.sendUDSCommand(UDS_Read21_01);
+    // Используем прямое управление вместо UDS
+    await this.sendDirectControlPoll();
   }
 
   async setTestMode(enabled: boolean): Promise<void> {
