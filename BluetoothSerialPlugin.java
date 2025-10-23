@@ -92,6 +92,8 @@ public class BluetoothSerialPlugin extends Plugin {
           try {
             JSONObject o = new JSONObject();
             o.put("name", d.getName());
+            // КРИТИЧНО: поле должно называться "address", НЕ "mac"!
+            // TypeScript ожидает { address: string; name: string }
             o.put("address", d.getAddress());
             arr.put(o);
             seen.add(d.getAddress());
