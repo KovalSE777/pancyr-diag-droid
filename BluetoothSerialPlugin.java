@@ -38,7 +38,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
   permissions = {
     @Permission(strings = { Manifest.permission.BLUETOOTH_CONNECT }, alias = "btConnect"),
     @Permission(strings = { Manifest.permission.BLUETOOTH_SCAN }, alias = "btScan"),
-    @Permission(strings = { Manifest.permission.ACCESS_FINE_LOCATION }, alias = "fineLocation")
+    @Permission(strings = { Manifest.permission.ACCESS_FINE_LOCATION }, alias = "fineLocation"),
+    @Permission(strings = { Manifest.permission.ACCESS_COARSE_LOCATION }, alias = "coarseLocation")
   }
 )
 public class BluetoothSerialPlugin extends Plugin {
@@ -69,7 +70,7 @@ public class BluetoothSerialPlugin extends Plugin {
           return;
         }
       } else {
-        if (!hasPermission("fineLocation")) {
+        if (!hasPermission("fineLocation") && !hasPermission("coarseLocation")) {
           requestPermissionForAlias("fineLocation", call, "scanPerms");
           return;
         }
@@ -98,7 +99,7 @@ public class BluetoothSerialPlugin extends Plugin {
     if (Build.VERSION.SDK_INT >= 31) {
       return hasPermission("btScan") && hasPermission("btConnect");
     } else {
-      return hasPermission("fineLocation");
+      return hasPermission("fineLocation") || hasPermission("coarseLocation");
     }
   }
 
