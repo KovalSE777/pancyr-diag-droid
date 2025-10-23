@@ -57,13 +57,24 @@ public class BluetoothSerialPlugin extends Plugin {
 
     // Проверяем разрешения
     if (!hasScanPermissions()) {
-      Log.d(TAG, "📍 Requesting permissions (by aliases)...");
+      Log.d(TAG, "📍 Requesting permissions...");
       if (Build.VERSION.SDK_INT >= 31) {
-        requestPermissionsForAliases(new String[]{"btScan", "btConnect"}, call, "scanPerms");
+        // Android 12+ требует btScan и btConnect
+        if (!hasPermission("btScan")) {
+          requestPermissionForAlias("btScan", call, "scanPerms");
+          return;
+        }
+        if (!hasPermission("btConnect")) {
+          requestPermissionForAlias("btConnect", call, "scanPerms");
+          return;
+        }
       } else {
-        requestPermissionsForAliases(new String[]{"fineLocation"}, call, "scanPerms");
+        // Android 6-11 требует геолокацию
+        if (!hasPermission("fineLocation")) {
+          requestPermissionForAlias("fineLocation", call, "scanPerms");
+          return;
+        }
       }
-      return;
     }
 
     // ✅ Разрешения есть - выполняем сканирование
