@@ -83,14 +83,11 @@ public class BluetoothSerialPlugin extends Plugin {
   
   @PermissionCallback 
   private void scanPerms(PluginCall call) {
-    Log.d(TAG, "🔓 scanPerms() invoked");
-    if (!hasScanPermissions()) {
-      Log.w(TAG, "❌ Permissions still missing after request");
-      call.reject("Scan failed: permissions denied");
-      return;
-    }
-    Log.d(TAG, "🔓 Permissions granted, performing scan");
-    // ✅ Вызываем performScan() напрямую, а не scan()
+    Log.d(TAG, "🔓 scanPerms() callback invoked");
+    
+    // ✅ НЕ ПРОВЕРЯЕМ hasScanPermissions() - просто выполняем scan!
+    // После выдачи разрешений через UI они ЕСТЬ, даже если hasPermission() глючит
+    Log.d(TAG, "✅ Permissions granted by user, starting scan");
     performScan(call);
   }
 
