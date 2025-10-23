@@ -57,9 +57,23 @@ public class BluetoothSerialPlugin extends Plugin {
 
     // Проверяем разрешения
     if (!hasScanPermissions()) {
-      Log.d(TAG, "📍 Requesting permissions...");
-      requestAllPermissions(call, "scanPerms");
-      return;
+      Log.d(TAG, "📍 Requesting permissions (per alias)...");
+      saveCall(call);
+      if (Build.VERSION.SDK_INT >= 31) {
+        if (!hasPermission("btScan")) {
+          requestPermissionForAlias("btScan", call, "scanPerms");
+          return;
+        }
+        if (!hasPermission("btConnect")) {
+          requestPermissionForAlias("btConnect", call, "scanPerms");
+          return;
+        }
+      } else {
+        if (!hasPermission("fineLocation")) {
+          requestPermissionForAlias("fineLocation", call, "scanPerms");
+          return;
+        }
+      }
     }
 
     // ✅ Разрешения есть - выполняем сканирование
@@ -68,9 +82,15 @@ public class BluetoothSerialPlugin extends Plugin {
   
   @PermissionCallback 
   private void scanPerms(PluginCall call) {
+    Log.d(TAG, "🔓 scanPerms() invoked");
+    // If any permission still missing, request the remaining one(s)
     if (!hasScanPermissions()) {
-      call.reject("Scan failed: permissions denied");
-      return;
+      if (Build.VERSION.SDK_INT >= 31) {
+        if (!hasPermission("btScan")) { requestPermissionForAlias("btScan", call, "scanPerms"); return; }
+        if (!hasPermission("btConnect")) { requestPermissionForAlias("btConnect", call, "scanPerms"); return; }
+      } else {
+        if (!hasPermission("fineLocation")) { requestPermissionForAlias("fineLocation", call, "scanPerms"); return; }
+      }
     }
     Log.d(TAG, "🔓 Permissions granted, performing scan");
     // ✅ Вызываем performScan() напрямую, а не scan()
