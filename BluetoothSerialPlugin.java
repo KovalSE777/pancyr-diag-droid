@@ -100,6 +100,22 @@ public class BluetoothSerialPlugin extends Plugin {
     }
   }
 
+  // ✅ Переопределение метода из родительского класса Plugin
+  @Override
+  public boolean hasRequiredPermissions() {
+    if (Build.VERSION.SDK_INT >= 31) {
+      boolean hasBtScan = hasPermission("btScan");
+      boolean hasBtConnect = hasPermission("btConnect");
+      Log.d(TAG, "hasRequiredPermissions: btScan=" + hasBtScan + ", btConnect=" + hasBtConnect);
+      return hasBtScan && hasBtConnect;
+    } else {
+      boolean hasFineLocation = hasPermission("fineLocation");
+      boolean hasCoarseLocation = hasPermission("coarseLocation");
+      Log.d(TAG, "hasRequiredPermissions: fineLocation=" + hasFineLocation + ", coarseLocation=" + hasCoarseLocation);
+      return hasFineLocation || hasCoarseLocation;
+    }
+  }
+
   // ✅ Реальная логика сканирования (без проверки разрешений)
   private void performScan(PluginCall call) {
     Log.d(TAG, "✅ Starting actual scan");
