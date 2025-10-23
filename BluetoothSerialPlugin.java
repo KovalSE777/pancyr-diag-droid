@@ -58,11 +58,7 @@ public class BluetoothSerialPlugin extends Plugin {
     // Проверяем разрешения
     if (!hasScanPermissions()) {
       Log.d(TAG, "📍 Requesting permissions...");
-      if (Build.VERSION.SDK_INT >= 31) {
-        requestPermissionForAliases(new String[]{"btScan", "btConnect"}, call, "scanPerms");
-      } else {
-        requestPermissionForAliases(new String[]{"fineLocation"}, call, "scanPerms");
-      }
+      requestAllPermissions(call, "scanPerms");
       return;
     }
 
