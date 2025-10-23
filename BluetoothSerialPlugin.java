@@ -86,10 +86,25 @@ public class BluetoothSerialPlugin extends Plugin {
     // If any permission still missing, request the remaining one(s)
     if (!hasScanPermissions()) {
       if (Build.VERSION.SDK_INT >= 31) {
-        if (!hasPermission("btScan")) { requestPermissionForAlias("btScan", call, "scanPerms"); return; }
-        if (!hasPermission("btConnect")) { requestPermissionForAlias("btConnect", call, "scanPerms"); return; }
+        if (!hasPermission("btScan")) {
+          Log.d(TAG, "➡️ Requesting missing permission: btScan");
+          saveCall(call);
+          requestPermissionForAlias("btScan", call, "scanPerms");
+          return;
+        }
+        if (!hasPermission("btConnect")) {
+          Log.d(TAG, "➡️ Requesting missing permission: btConnect");
+          saveCall(call);
+          requestPermissionForAlias("btConnect", call, "scanPerms");
+          return;
+        }
       } else {
-        if (!hasPermission("fineLocation")) { requestPermissionForAlias("fineLocation", call, "scanPerms"); return; }
+        if (!hasPermission("fineLocation")) {
+          Log.d(TAG, "➡️ Requesting missing permission: fineLocation");
+          saveCall(call);
+          requestPermissionForAlias("fineLocation", call, "scanPerms");
+          return;
+        }
       }
     }
     Log.d(TAG, "🔓 Permissions granted, performing scan");
