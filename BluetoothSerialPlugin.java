@@ -78,7 +78,7 @@ public class BluetoothSerialPlugin extends Plugin {
   
   @PermissionCallback 
   private void scanPerms(PluginCall call) {
-    if (!hasRequiredPermissions()) {
+    if (!hasScanPermissions()) {
       call.reject("Scan failed: permissions denied");
       return;
     }
@@ -87,8 +87,8 @@ public class BluetoothSerialPlugin extends Plugin {
     performScan(call);
   }
 
-  // Проверка всех необходимых разрешений
-  private boolean hasRequiredPermissions() {
+  // Проверка всех необходимых разрешений для сканирования
+  private boolean hasScanPermissions() {
     if (Build.VERSION.SDK_INT >= 31) {
       return hasPermission("btScan") && hasPermission("btConnect");
     } else {
