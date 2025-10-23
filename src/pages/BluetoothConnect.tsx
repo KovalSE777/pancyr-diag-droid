@@ -2,7 +2,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ArrowLeft, Bluetooth, Loader2, CheckCircle2, AlertCircle, Wrench } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { capacitorBluetoothService } from "@/utils/capacitor-bluetooth";
 import { useToast } from "@/hooks/use-toast";
 import bluetoothIcon from "@/assets/bluetooth-icon.png";
@@ -25,6 +25,7 @@ const BluetoothConnect = () => {
   const [isScanning, setIsScanning] = useState(false);
   const [devices, setDevices] = useState<DiscoveredDevice[]>([]);
   const [cancelRequested, setCancelRequested] = useState(false); // Флаг отмены подключения
+  const scanInProgressRef = useRef(false); // Защита от повторных вызовов
   
   const systemType = searchParams.get('type') || 'ska';
 
@@ -33,11 +34,10 @@ const BluetoothConnect = () => {
       const isNative = Capacitor.isNativePlatform();
 
       if (isNative) {
-        // Native: show device picker and scan; pairing/PIN prompt will be handled by OS upon connect
+        // Native: show device picker (scan will be triggered by useEffect)
         setDevicePickerOpen(true);
         setConnectionStatus('idle');
         setIsConnecting(false);
-        await startScan();
         return;
       }
 
@@ -71,11 +71,20 @@ const BluetoothConnect = () => {
 
   // Native scan and connect flow
   const startScan = async () => {
+    // Защита от повторных вызовов
+    if (scanInProgressRef.current) {
+      logService.warn('BT Scan', 'Scan already in progress, ignoring duplicate call');
+      return;
+    }
+    
     try {
+      scanInProgressRef.current = true;
       setIsScanning(true);
       setDevices([]);
+      logService.info('BT Scan', 'Starting scan...');
       const result = await BluetoothSerial.scan();
       const discoveredDevices = result.devices || [];
+      logService.info('BT Scan', `Found ${discoveredDevices.length} devices`);
       setDevices(discoveredDevices.map(d => ({
         deviceId: d.address,
         name: d.name,
@@ -90,12 +99,22 @@ const BluetoothConnect = () => {
         description: e instanceof Error ? e.message : 'Не удалось начать сканирование', 
         variant: 'destructive' 
       });
+    } finally {
+      scanInProgressRef.current = false;
     }
   };
 
   const stopScan = async () => {
     setIsScanning(false);
+    scanInProgressRef.current = false;
   };
+
+  // Автоматический запуск сканирования при открытии диалога
+  useEffect(() => {
+    if (devicePickerOpen && Capacitor.isNativePlatform()) {
+      startScan();
+    }
+  }, [devicePickerOpen]);
 
   const connectToDevice = async (deviceId: string) => {
     try {
