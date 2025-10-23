@@ -72,6 +72,34 @@ public class BluetoothSerialPlugin extends Plugin {
       }
     }
 
+    // ✅ Разрешения есть - выполняем сканирование
+    performScan(call);
+  }
+  
+  @PermissionCallback 
+  private void scanPerms(PluginCall call) {
+    if (!hasRequiredPermissions()) {
+      call.reject("Scan failed: permissions denied");
+      return;
+    }
+    Log.d(TAG, "🔓 Permissions granted, performing scan");
+    // ✅ Вызываем performScan() напрямую, а не scan()
+    performScan(call);
+  }
+
+  // Проверка всех необходимых разрешений
+  private boolean hasRequiredPermissions() {
+    if (Build.VERSION.SDK_INT >= 31) {
+      return hasPermission("btScan") && hasPermission("btConnect");
+    } else {
+      return hasPermission("fineLocation");
+    }
+  }
+
+  // ✅ Реальная логика сканирования (без проверки разрешений)
+  private void performScan(PluginCall call) {
+    Log.d(TAG, "✅ Starting actual scan");
+    
     BluetoothAdapter a = BluetoothAdapter.getDefaultAdapter();
     JSONArray arr = new JSONArray();
     if (a == null) {
@@ -154,12 +182,6 @@ public class BluetoothSerialPlugin extends Plugin {
     JSObject ret = new JSObject(); 
     ret.put("devices", arr); 
     call.resolve(ret);
-  }
-  
-  @PermissionCallback 
-  private void scanPerms(PluginCall call) { 
-    Log.d(TAG, "🔓 Permissions granted, retrying scan");
-    scan(call); 
   }
 
   @PluginMethod
