@@ -205,10 +205,10 @@ const BluetoothConnect = () => {
 
   return (
     <div className="min-h-screen bg-background relative overflow-hidden safe-top safe-bottom">
-      {/* Lightweight Background */}
+      {/* Optimized Beautiful Background */}
       <div className="absolute inset-0">
-        <div className="absolute inset-0 opacity-10 bg-cover bg-center" style={{ backgroundImage: `url(${patternBg})` }} />
-        <div className="absolute inset-0 bg-gradient-to-b from-background/90 to-background" />
+        <div className="absolute inset-0 opacity-20 bg-cover bg-center" style={{ backgroundImage: `url(${patternBg})` }} />
+        <div className="absolute inset-0 bg-gradient-to-b from-background/85 to-background" />
       </div>
       
       {/* Header */}
@@ -232,11 +232,11 @@ const BluetoothConnect = () => {
         {/* Compact Connection Status */}
         <Card className="premium-card p-6 mb-4">
           <div className="flex flex-col items-center text-center space-y-4">
-            <div className="relative w-32 h-32 flex items-center justify-center">
+            <div className="relative w-40 h-40 flex items-center justify-center">
               <img 
                 src={bluetoothPremiumIcon} 
                 alt="Bluetooth" 
-                className={`relative w-full h-full object-contain ${
+                className={`relative w-full h-full object-contain transition-transform ${
                   connectionStatus === 'connected' ? 'scale-110' : ''
                 }`}
               />

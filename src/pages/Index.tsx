@@ -10,13 +10,17 @@ const Index = () => {
 
   return (
     <main className="min-h-screen relative overflow-hidden">
-      {/* Lightweight Background */}
+      {/* Optimized Beautiful Background */}
       <div className="absolute inset-0">
         <div 
-          className="absolute inset-0 bg-cover bg-center opacity-30"
+          className="absolute inset-0 bg-cover bg-center opacity-50"
           style={{ backgroundImage: `url(${heroGradientBg})` }}
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-background/90 via-background/95 to-background" />
+        <div 
+          className="absolute inset-0 opacity-15 bg-cover bg-center"
+          style={{ backgroundImage: `url(${patternBg})` }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-background/80 via-background/90 to-background" />
       </div>
       
       {/* Content */}
@@ -63,8 +67,8 @@ const Index = () => {
             >
               <div className="relative p-5 h-full flex flex-col items-center justify-center text-center space-y-4">
                 {/* Icon */}
-                <div className="relative w-16 h-16 rounded-2xl bg-primary/10 border border-primary/30 flex items-center justify-center">
-                  <Settings className="w-8 h-8 text-primary" />
+                <div className="relative w-20 h-20 rounded-2xl bg-primary/10 border border-primary/30 flex items-center justify-center group-hover:scale-105 transition-transform">
+                  <Settings className="w-10 h-10 text-primary" />
                 </div>
                 
                 <div className="space-y-2">
@@ -109,8 +113,8 @@ const Index = () => {
             >
               <div className="relative p-5 h-full flex flex-col items-center justify-center text-center space-y-4">
                 {/* Icon */}
-                <div className="relative w-16 h-16 rounded-2xl bg-secondary/10 border border-secondary/30 flex items-center justify-center">
-                  <Wrench className="w-8 h-8 text-secondary" />
+                <div className="relative w-20 h-20 rounded-2xl bg-secondary/10 border border-secondary/30 flex items-center justify-center group-hover:scale-105 transition-transform">
+                  <Wrench className="w-10 h-10 text-secondary" />
                 </div>
                 
                 <div className="space-y-2">

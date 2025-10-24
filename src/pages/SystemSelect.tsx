@@ -55,13 +55,13 @@ const SystemSelect = () => {
 
   return (
     <div className="min-h-screen bg-background relative overflow-hidden safe-top safe-bottom">
-      {/* Lightweight Background */}
+      {/* Optimized Beautiful Background */}
       <div className="absolute inset-0">
         <div 
-          className="absolute inset-0 opacity-10 bg-cover bg-center"
+          className="absolute inset-0 opacity-20 bg-cover bg-center"
           style={{ backgroundImage: `url(${patternBg})` }}
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-background/90 to-background" />
+        <div className="absolute inset-0 bg-gradient-to-b from-background/85 to-background" />
       </div>
       
       {/* Compact Header */}
@@ -90,7 +90,7 @@ const SystemSelect = () => {
           <div className="flex flex-col items-center gap-4">
             
             {/* Compact Icon */}
-            <div className="relative w-20 h-20 rounded-2xl bg-card border border-border/50 p-3 flex items-center justify-center">
+            <div className="relative w-28 h-28 rounded-2xl bg-card border border-border/50 p-4 flex items-center justify-center">
               <img 
                 src={acPremiumIcon} 
                 alt="AC System" 
@@ -140,8 +140,8 @@ const SystemSelect = () => {
             onClick={() => navigate(`/bluetooth-connect?type=${systemType}`)}
           >
             <div className="relative p-5 flex flex-col items-center text-center space-y-3">
-              <div className="w-14 h-14 rounded-xl bg-primary/10 border border-primary/30 flex items-center justify-center">
-                <Bluetooth className="w-7 h-7 text-primary" />
+              <div className="w-16 h-16 rounded-xl bg-primary/10 border border-primary/30 flex items-center justify-center group-hover:scale-105 transition-transform">
+                <Bluetooth className="w-8 h-8 text-primary" />
               </div>
               
               <div className="space-y-1.5">
@@ -165,8 +165,8 @@ const SystemSelect = () => {
             onClick={() => navigate(`/repair-guide?type=${systemType}`)}
           >
             <div className="relative p-5 flex flex-col items-center text-center space-y-3">
-              <div className="w-14 h-14 rounded-xl bg-accent/10 border border-accent/30 flex items-center justify-center">
-                <BookOpen className="w-7 h-7 text-accent" />
+              <div className="w-16 h-16 rounded-xl bg-accent/10 border border-accent/30 flex items-center justify-center group-hover:scale-105 transition-transform">
+                <BookOpen className="w-8 h-8 text-accent" />
               </div>
               
               <div className="space-y-1.5">

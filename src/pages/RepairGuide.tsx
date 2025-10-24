@@ -299,8 +299,8 @@ const RepairGuide = () => {
 
   return (
     <div className="min-h-screen bg-background pb-16 relative overflow-hidden safe-top safe-bottom">
-      <div className="absolute inset-0 opacity-10 bg-cover bg-center" style={{ backgroundImage: `url(${patternBg})` }} />
-      <div className="absolute inset-0 bg-gradient-to-b from-background/90 to-background" />
+      <div className="absolute inset-0 opacity-20 bg-cover bg-center" style={{ backgroundImage: `url(${patternBg})` }} />
+      <div className="absolute inset-0 bg-gradient-to-b from-background/85 to-background" />
       {/* Compact Header */}
       <header className="glass-header sticky top-0 z-50 relative">
         <div className="container mx-auto px-3 py-3">
