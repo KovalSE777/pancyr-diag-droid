@@ -235,51 +235,6 @@ export function parseBskuPacket(rawData: Uint8Array): BskuPacket | null {
   };
 }
 
-// ========== УСТАРЕВШИЕ UDS ФУНКЦИИ (для обратной совместимости) ==========
-
-export function buildUDS(dst = 0x2A, src = 0xF1, sid: number, data: number[] = []): Uint8Array {
-  const body = Uint8Array.from([dst, src, sid, ...data]);
-  const B = body.length + 1;
-  const hdr = 0x80 | ((B - 2) & 0x3F);
-  const noChk = Uint8Array.from([hdr, ...body]);
-  const chk = sum8(noChk);
-  return Uint8Array.from([...noChk, chk]);
-}
-
-/**
- * АЛЬТЕРНАТИВНЫЙ РЕЖИМ: ПРЯМОЕ УПРАВЛЕНИЕ
- * Этот режим может работать если основной протокол (ASCII команды) не работает
- * Формат: [HDR, DST=0x2A, SRC=0xF1, iUPR_BT, iUPR_IND, iDAT_BIT, dlt_paus, CHK]
- */
-export function buildDirectControl(
-  iUPR_BT: number,    // Управление реле (M1-M5, CMP)
-  iUPR_IND: number,   // Управление индикаторами
-  iDAT_BIT: number,   // Битовые флаги состояния
-  dlt_paus: number    // Задержка паузы (0-255)
-): Uint8Array {
-  const body = Uint8Array.from([
-    0x2A,      // DST (БСКУ)
-    0xF1,      // SRC (приложение/тестер)
-    iUPR_BT,   // Байт управления реле
-    iUPR_IND,  // Байт управления индикаторами
-    iDAT_BIT,  // Байт флагов
-    dlt_paus   // Задержка
-  ]);
-  
-  const B = body.length + 1; // +CHK
-  const hdr = 0x80 | ((B - 2) & 0x3F);
-  const noChk = Uint8Array.from([hdr, ...body]);
-  const chk = sum8(noChk);
-  
-  return Uint8Array.from([...noChk, chk]);
-}
-
-// АЛЬТЕРНАТИВНЫЙ режим: Пакет опроса состояния
-export const DirectControl_Poll = buildDirectControl(0x00, 0x00, 0x00, 0x00);
-
-// ACK (ASCII, без CHK)
-export const ackUOKS = (n: number) => enc.encode(`UOKS${String.fromCharCode(n & 0xFF)}`);
-export const ackUOKP = (n: number) => enc.encode(`UOKP${String.fromCharCode(n & 0xFF)}`);
 
 export class ProtocolParser {
   private acc = new Uint8Array(0);

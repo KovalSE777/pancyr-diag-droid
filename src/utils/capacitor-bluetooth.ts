@@ -6,9 +6,6 @@ import {
   buildCyclicPoll,
   parseBskuPacket,
   BskuPacketType,
-  DirectControl_Poll,
-  ProtocolParser,
-  type ParsedFrame,
   type BskuPacket
 } from './protocol-parser';
 import { Screen4Parser } from './screen4-parser';
@@ -16,20 +13,16 @@ import { logService } from './log-service';
 import { HexFrame } from '@/components/diagnostics/LiveHexMonitor';
 import { NativeBluetoothWrapper } from './native-bluetooth';
 import { bytesToHex, hexToBytes, formatBytes } from './hex';
-import { BT_TIMING, UDS_ADDRESSES, DATA_LIMITS } from './bluetooth-constants';
+import { BT_TIMING, DATA_LIMITS } from './bluetooth-constants';
 
 export class CapacitorBluetoothService {
   private deviceAddress: string | null = null;
   private latestData: DiagnosticData | null = null;
   private systemType: SystemType = 'SKA';
-  private parser: ProtocolParser = new ProtocolParser();
-  private testerPresentInterval: number | null = null;
-  private connectionEstablished: boolean = false;
   private hexFrames: HexFrame[] = [];
   private onFramesUpdate?: (frames: HexFrame[]) => void;
   private bt: NativeBluetoothWrapper = new NativeBluetoothWrapper();
   private cyclicPollInterval: NodeJS.Timeout | null = null;
-  private useNewProtocol = true; // Новый протокол (ASCII команды) по умолчанию
   private receiveBuffer = new Uint8Array(0); // Буфер для накопления данных
   
   async initialize(): Promise<void> {
@@ -77,8 +70,6 @@ export class CapacitorBluetoothService {
       // Обработка потери соединения
       this.bt.onConnectionLost(() => {
         logService.error('BT Serial', 'Connection lost - device disconnected');
-        this.connectionEstablished = false;
-        this.stopPeriodicRead();
         this.stopCyclicPolling();
       });
       
@@ -88,8 +79,6 @@ export class CapacitorBluetoothService {
       
       // 3) Пауза для стабилизации соединения
       await new Promise(resolve => setTimeout(resolve, BT_TIMING.CONNECTION_STABILIZATION_DELAY));
-      
-      this.connectionEstablished = true;
       
       // 4) Запускаем инициализацию с новым протоколом
       await this.startCommunication();
@@ -105,24 +94,17 @@ export class CapacitorBluetoothService {
   // Больше не нужен - данные приходят через listener нативного плагина
 
   async disconnect(): Promise<void> {
-    this.stopPeriodicRead();
     this.stopCyclicPolling();
     
     if (this.deviceAddress) {
       try {
-        const wasConnected = this.connectionEstablished;
-        
         await this.bt.disconnect();
         this.deviceAddress = null;
-        this.connectionEstablished = false;
-        this.parser.clearBuffer();
         this.receiveBuffer = new Uint8Array(0); // Очистка буфера
         this.hexFrames = [];
         this.latestData = null;
         
-        if (wasConnected) {
-          await new Promise(resolve => setTimeout(resolve, 500));
-        }
+        await new Promise(resolve => setTimeout(resolve, 500));
       } catch (error) {
         logService.error('BT Serial', `Disconnect error: ${error}`);
       }
@@ -130,7 +112,7 @@ export class CapacitorBluetoothService {
   }
   
   isConnected(): boolean {
-    return this.deviceAddress !== null && this.connectionEstablished;
+    return this.deviceAddress !== null;
   }
   // Удалены дублированные методы hexToBytes/bytesToHex - используем из utils/hex.ts
 
@@ -143,36 +125,29 @@ export class CapacitorBluetoothService {
    * 4. Через 500ms запустить циклический опрос
    */
   private async startCommunication(): Promise<void> {
-    if (this.useNewProtocol) {
-      logService.info('BT Serial', '🚀 Starting NEW protocol (ASCII commands)');
-      
-      // 1. Небольшая задержка после подключения для стабилизации
-      await new Promise(resolve => setTimeout(resolve, BT_TIMING.CONNECTION_STABILIZATION_DELAY));
-      
-      // 2. Отправить UCONF
-      logService.info('BT Serial', '📤 Sending UCONF (request configuration)...');
-      const uconfPacket = buildUCONF();
-      await this.sendRaw(uconfPacket);
-      
-      // 3. Дождаться ответа от БСКУ
-      // Ответ может быть:
-      //   - Фрейм 0x66 (SCREEN_CHANGE) → отправим UOKS
-      //   - Фрейм 0x77 (CONFIGURATION) → отправим UOKP
-      //   - Или сразу телеметрия
-      // Обрабатывается в handleIncomingData() через onBytes listener
-      
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // 4. Запустить циклический опрос телеметрии
-      this.startCyclicPolling();
-      
-      logService.success('BT Serial', '✅ NEW protocol communication sequence started');
-    } else {
-      // Альтернативный режим - прямое управление (резервный)
-      logService.info('BT Serial', '🔄 Using ALTERNATIVE protocol (Direct Control)');
-      await this.sendDirectControlPoll();
-      this.startPeriodicRead();
-    }
+    logService.info('BT Serial', '🚀 Starting NEW protocol (ASCII commands)');
+    
+    // 1. Небольшая задержка после подключения для стабилизации
+    await new Promise(resolve => setTimeout(resolve, BT_TIMING.CONNECTION_STABILIZATION_DELAY));
+    
+    // 2. Отправить UCONF
+    logService.info('BT Serial', '📤 Sending UCONF (request configuration)...');
+    const uconfPacket = buildUCONF();
+    await this.sendRaw(uconfPacket);
+    
+    // 3. Дождаться ответа от БСКУ
+    // Ответ может быть:
+    //   - Фрейм 0x66 (SCREEN_CHANGE) → отправим UOKS
+    //   - Фрейм 0x77 (CONFIGURATION) → отправим UOKP
+    //   - Или сразу телеметрия
+    // Обрабатывается в handleIncomingData() через onBytes listener
+    
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    // 4. Запустить циклический опрос телеметрии
+    this.startCyclicPolling();
+    
+    logService.success('BT Serial', '✅ NEW protocol communication sequence started');
   }
 
   /**
@@ -215,19 +190,14 @@ export class CapacitorBluetoothService {
    * Обработка входящих данных (с буферизацией)
    */
   private handleIncomingData(chunk: Uint8Array): void {
-    if (this.useNewProtocol) {
-      // Новый протокол: накапливаем в буфере
-      const newBuffer = new Uint8Array(this.receiveBuffer.length + chunk.length);
-      newBuffer.set(this.receiveBuffer, 0);
-      newBuffer.set(chunk, this.receiveBuffer.length);
-      this.receiveBuffer = newBuffer;
-      
-      // Пытаемся найти и распарсить пакеты с заголовком 0xFF
-      this.tryParseNewProtocolPackets();
-    } else {
-      // Альтернативный режим: используем старый парсер
-      this.parser.feed(chunk, (frame) => this.handleParsedFrameLegacy(frame));
-    }
+    // Накапливаем в буфере
+    const newBuffer = new Uint8Array(this.receiveBuffer.length + chunk.length);
+    newBuffer.set(this.receiveBuffer, 0);
+    newBuffer.set(chunk, this.receiveBuffer.length);
+    this.receiveBuffer = newBuffer;
+    
+    // Пытаемся найти и распарсить пакеты с заголовком 0xFF
+    this.tryParseNewProtocolPackets();
   }
 
   /**
@@ -283,46 +253,6 @@ export class CapacitorBluetoothService {
     }
   }
 
-  private handleParsedFrameLegacy(frame: ParsedFrame): void {
-    const hex = [...frame.raw].map(b => b.toString(16).padStart(2, '0')).join(' ').toUpperCase();
-    
-    logService.info('BT-RX frame', `Type=${frame.type}, CHK=${frame.ok ? 'OK' : 'FAIL'}, Info=${JSON.stringify(frame.info ?? {})}, Hex=${hex}`);
-    
-    if (frame.type === 'UDS_80P') {
-      const dst = frame.info?.dst ?? 0;
-      const src = frame.info?.src ?? 0;
-      const sid = frame.info?.sid ?? 0;
-      
-      logService.success('BT-RX frame', `✓ UDS 0x${dst.toString(16).toUpperCase()}←0x${src.toString(16).toUpperCase()} SID=0x${sid.toString(16).toUpperCase()}, CHK=${frame.ok ? 'OK' : 'FAIL'}, ${hex}`);
-      
-      if (sid === 0x61 && frame.ok && frame.raw.length >= 28) {
-        const payload = frame.raw.slice(5, frame.raw.length - 1);
-        
-        if (payload.length >= 22) {
-          const diagnosticData = Screen4Parser.parse(payload, this.systemType);
-          if (diagnosticData) {
-            this.latestData = diagnosticData;
-            logService.success('BT-RX', 'Telemetry parsed (legacy mode)');
-          } else {
-            logService.error('BT-RX', `Parse failed - payload length=${payload.length}`);
-          }
-        } else {
-          logService.error('BT-RX', `Payload too short: ${payload.length} bytes`);
-        }
-      }
-    }
-    else if (frame.type === 'SCR_66') {
-      const nScr = frame.info?.nScr ?? 0;
-      logService.success('BT-RX frame', `✓ 0x66 SCR_${nScr}, ${hex}`);
-    }
-    else if (frame.type === 'CFG_77') {
-      const nPak = frame.info?.nPak ?? 0;
-      logService.success('BT-RX frame', `✓ 0x77 Package=${nPak}, CHK=${frame.ok ? 'OK' : 'FAIL'}, ${hex}`);
-    }
-    else if (!frame.ok) {
-      logService.error('BT-RX frame', `✗ Checksum FAIL: ${hex}`);
-    }
-  }
 
   /**
    * Обработка пакета нового протокола
@@ -418,13 +348,6 @@ export class CapacitorBluetoothService {
     await this.bt.write(bytes);
   }
 
-  private async sendUDSCommand(packet: Uint8Array): Promise<void> {
-    if (!this.deviceAddress) throw new Error('Not connected');
-    const hex = Array.from(packet).map(b => b.toString(16).padStart(2, '0')).join(' ').toUpperCase();
-    logService.info('BT-TX', `UDS → ${hex}`);
-    await this.sendRaw(packet);
-  }
-
   private addHexFrame(direction: 'TX' | 'RX', hex: string, checksumOk?: boolean, description?: string): void {
     const frame: HexFrame = {
       direction,
@@ -452,48 +375,22 @@ export class CapacitorBluetoothService {
     return this.hexFrames;
   }
 
-  /**
-   * ПРЯМОЕ УПРАВЛЕНИЕ (НЕ UDS!)
-   * Отправляем пакет опроса состояния с нулевыми управляющими байтами.
-   * Устройство СРАЗУ ответит телеметрией (22 байта).
-   */
-  private async sendDirectControlPoll(): Promise<void> {
-    const hex = Array.from(DirectControl_Poll).map(b => b.toString(16).padStart(2, '0')).join(' ').toUpperCase();
-    logService.info('BT-TX', `DirectControl Poll → ${hex}`);
-    await this.sendRaw(DirectControl_Poll);
-  }
-
-  private periodicReadInterval: number | null = null;
-
-  private startPeriodicRead(): void {
-    this.stopPeriodicRead();
-    this.periodicReadInterval = window.setInterval(() => {
-      if (this.isConnected()) {
-        // Периодический опрос через DirectControl (НЕ UDS!)
-        this.sendDirectControlPoll().catch(() => {});
-      }
-    }, BT_TIMING.PERIODIC_READ_INTERVAL);
-  }
-
-  private stopPeriodicRead(): void {
-    if (this.periodicReadInterval) clearInterval(this.periodicReadInterval);
-  }
-
   getLatestData(): DiagnosticData | null {
     return this.latestData;
   }
 
+
   async requestDiagnosticData(): Promise<void> {
-    // Используем прямое управление вместо UDS
-    await this.sendDirectControlPoll();
+    // Данные приходят автоматически через циклический опрос
+    logService.info('BT Serial', 'Diagnostic data is polled automatically via cyclic polling');
   }
 
   async setTestMode(enabled: boolean): Promise<void> {
-    logService.warn('BT-TX', 'setTestMode not implemented yet');
+    logService.warn('BT-TX', 'setTestMode not implemented for new protocol yet');
   }
 
   async controlRelays(relays: any): Promise<void> {
-    logService.warn('BT-TX', 'controlRelays not implemented yet');
+    logService.warn('BT-TX', 'controlRelays not implemented for new protocol yet');
   }
 
   getMockData(systemType: string = 'SKA'): DiagnosticData {
