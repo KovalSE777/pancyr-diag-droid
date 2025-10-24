@@ -234,58 +234,12 @@ const Diagnostics = () => {
               <Badge className={`${getModeColor()} shadow-lg min-h-[28px] px-3`}>
                 {getModeText()}
               </Badge>
-              {!useMock && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowDebug(!showDebug)}
-                  className="border-primary/50 text-primary hover:bg-primary/10 min-h-[28px] px-3"
-                >
-                  {showDebug ? 'Скрыть' : 'Логи'}
-                </Button>
-              )}
             </div>
           </div>
         </div>
       </header>
 
       <main className="relative container mx-auto px-4 py-6 space-y-6 safe-bottom">
-        {/* Live HEX Monitor */}
-        {!useMock && Capacitor.isNativePlatform() && (
-          <LiveHexMonitor frames={hexFrames} />
-        )}
-
-        {/* Connection Debug Info */}
-        {!useMock && showDebug && (
-          <Card className="premium-card p-5 border-primary/30 animate-fade-in">
-            <h3 className="text-base font-bold text-foreground mb-4 flex items-center gap-2">
-              <Activity className="w-5 h-5 text-primary" />
-              Состояние BLE подключения
-            </h3>
-            <div className="space-y-2 text-sm font-mono">
-              <div className="flex justify-between items-center p-3 glass-card rounded-xl">
-                <span className="text-muted-foreground">Подключено:</span>
-                <span className={connectionInfo.connected ? 'text-success font-bold' : 'text-destructive font-bold'}>
-                  {connectionInfo.connected ? '✅ Да' : '❌ Нет'}
-                </span>
-              </div>
-              <div className="flex justify-between items-center p-3 glass-card rounded-xl">
-                <span className="text-muted-foreground">Запросов:</span>
-                <span className="text-accent font-bold">{connectionInfo.requestCount}</span>
-              </div>
-              <div className="flex justify-between items-center p-3 glass-card rounded-xl">
-                <span className="text-muted-foreground">Ответов:</span>
-                <span className="text-success font-bold">{connectionInfo.responseCount}</span>
-              </div>
-              {connectionInfo.requestCount > 0 && connectionInfo.responseCount === 0 && (
-                <div className="p-4 bg-destructive/10 border-2 border-destructive/30 rounded-xl text-destructive font-normal">
-                  ⚠️ Запросы отправляются, но ответов нет
-                </div>
-              )}
-            </div>
-          </Card>
-        )}
-
         {/* Test Mode Control */}
         <TestModeControl
           systemType={systemType.toUpperCase() as 'SKA' | 'SKE'}
