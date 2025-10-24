@@ -241,25 +241,56 @@ public class BluetoothSerialPlugin extends Plugin {
   }
 
   private void startReader() {
-    if (readerRunning.getAndSet(true)) return;
+    if (readerRunning.getAndSet(true)) {
+      Log.w(TAG, "⚠️ Reader already running, skipping");
+      return;
+    }
+    
+    Log.d(TAG, "🔄 Reader thread starting...");
+    
     ioPool.execute(() -> {
       byte[] buf = new byte[1024];
       try {
+        Log.d(TAG, "✅ Reader thread started, waiting for data...");
+        
         while (readerRunning.get()) {
+          Log.d(TAG, "⏳ Calling inp.read() (blocking call)...");
+          
           int n = inp.read(buf);
-          if (n <= 0) break;
+          
+          Log.d(TAG, "📥 inp.read() returned: " + n + " bytes");
+          
+          if (n <= 0) {
+            Log.w(TAG, "⚠️ read() returned " + n + ", stopping");
+            break;
+          }
+          
           byte[] chunk = Arrays.copyOf(buf, n);
-          JSObject ev = new JSObject();
-          // КРИТИЧНО: NO_WRAP для совместимости с TypeScript
-          ev.put("data", Base64.encodeToString(chunk, Base64.NO_WRAP));
-          notifyListeners("data", ev);
+          
+          // Показать HEX данных
+          StringBuilder hex = new StringBuilder();
+          for (byte b : chunk) {
+            hex.append(String.format("%02X ", b & 0xFF));
+          }
+          Log.d(TAG, "📦 Received HEX: " + hex.toString());
+          
+          String b64 = Base64.encodeToString(chunk, Base64.NO_WRAP);
+          Log.d(TAG, "📦 Base64: " + b64);
+          
+          JSObject evt = new JSObject();
+          evt.put("data", b64);
+          notifyListeners("data", evt);
+          
+          Log.d(TAG, "✅ Data forwarded to JS");
         }
+      } catch (IOException e) {
+        Log.e(TAG, "❌ Reader IOException: " + e.getMessage());
+        e.printStackTrace();
       } catch (Exception e) {
-        Log.e(TAG, "❌ Reader error: " + e.getMessage());
-        JSObject ev = new JSObject();
-        ev.put("message", e.getMessage());
-        notifyListeners("connectionLost", ev);
+        Log.e(TAG, "❌ Reader Exception: " + e.getMessage());
+        e.printStackTrace();
       } finally {
+        Log.d(TAG, "🛑 Reader thread stopped");
         readerRunning.set(false);
       }
     });

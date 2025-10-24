@@ -75,9 +75,11 @@ export function buildUOKS(screenId: number): Uint8Array {
   const encoder = new TextEncoder();
   const command = encoder.encode('UOKS');
   
-  const packet = new Uint8Array(5);
-  packet.set(command, 0);  // 'U','O','K','S'
-  packet[4] = screenId & 0xFF;  // Сырой байт, НЕ ASCII
+  const packet = new Uint8Array(7);  // ✅ 7 байт!
+  packet.set(command, 0);            // "UOKS" (4 байта)
+  packet[4] = screenId & 0xFF;       // screenId
+  packet[5] = 0x00;                  // padding
+  packet[6] = 0x00;                  // padding
   
   return packet;
 }

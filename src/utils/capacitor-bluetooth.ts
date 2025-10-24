@@ -125,29 +125,26 @@ export class CapacitorBluetoothService {
    * 4. Через 500ms запустить циклический опрос
    */
   private async startCommunication(): Promise<void> {
-    logService.info('BT Serial', '🚀 Starting NEW protocol (ASCII commands)');
+    logService.info('BT Serial', '🚀 Starting communication');
     
-    // 1. Небольшая задержка после подключения для стабилизации
-    await new Promise(resolve => setTimeout(resolve, BT_TIMING.CONNECTION_STABILIZATION_DELAY));
-    
-    // 2. Отправить UCONF
-    logService.info('BT Serial', '📤 Sending UCONF (request configuration)...');
+    // 1. UCONF
     const uconfPacket = buildUCONF();
     await this.sendRaw(uconfPacket);
+    logService.info('BT Serial', '📤 Sent UCONF');
     
-    // 3. Дождаться ответа от БСКУ
-    // Ответ может быть:
-    //   - Фрейм 0x66 (SCREEN_CHANGE) → отправим UOKS
-    //   - Фрейм 0x77 (CONFIGURATION) → отправим UOKP
-    //   - Или сразу телеметрия
-    // Обрабатывается в handleIncomingData() через onBytes listener
+    await new Promise(resolve => setTimeout(resolve, 200));
     
-    await new Promise(resolve => setTimeout(resolve, 500));
+    // 2. UOKS
+    const uoksPacket = buildUOKS(4);
+    await this.sendRaw(uoksPacket);
+    logService.info('BT Serial', '📤 Sent UOKS(4)');
     
-    // 4. Запустить циклический опрос телеметрии
+    await new Promise(resolve => setTimeout(resolve, 300));
+    
+    // 3. Cyclic polling
     this.startCyclicPolling();
     
-    logService.success('BT Serial', '✅ NEW protocol communication sequence started');
+    logService.info('BT Serial', '✅ Communication started');
   }
 
   /**
