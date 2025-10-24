@@ -55,14 +55,18 @@ const SystemSelect = () => {
 
   return (
     <div className="min-h-screen bg-background relative overflow-hidden safe-top safe-bottom">
-      {/* Optimized Beautiful Background */}
+      {/* Multi-layer Optimized Background */}
       <div className="absolute inset-0">
         <div 
-          className="absolute inset-0 opacity-20 bg-cover bg-center"
+          className="absolute inset-0 opacity-30 bg-cover bg-center"
           style={{ backgroundImage: `url(${patternBg})` }}
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-background/85 to-background" />
+        <div className="absolute inset-0 bg-gradient-to-b from-background/75 via-background/90 to-background" />
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5" />
       </div>
+      
+      {/* Subtle glow */}
+      <div className={`absolute top-1/3 right-1/4 w-64 h-64 bg-${info.color}/5 rounded-full blur-3xl`} />
       
       {/* Compact Header */}
       <header className="glass-header sticky top-0 z-50">

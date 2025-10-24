@@ -160,12 +160,17 @@ const Diagnostics = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background relative overflow-hidden pb-24">
-      {/* Premium Background */}
+    <div className="min-h-screen bg-background relative overflow-hidden pb-24 safe-top safe-bottom">
+      {/* Multi-layer Optimized Background */}
       <div className="fixed inset-0 pointer-events-none">
-        <div className="absolute inset-0 opacity-5 bg-cover bg-center" style={{ backgroundImage: `url(${patternBg})` }} />
-        <div className="absolute inset-0 bg-gradient-to-b from-background via-background/98 to-background" />
+        <div className="absolute inset-0 opacity-30 bg-cover bg-center" style={{ backgroundImage: `url(${patternBg})` }} />
+        <div className="absolute inset-0 bg-gradient-to-b from-background/75 via-background/90 to-background" />
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5" />
       </div>
+      
+      {/* Subtle glow */}
+      <div className="fixed top-1/4 right-1/4 w-64 h-64 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
+      <div className="fixed bottom-1/4 left-1/4 w-64 h-64 bg-accent/5 rounded-full blur-3xl pointer-events-none" />
 
       {/* Premium Header - Mobile optimized */}
       <header className="glass-header sticky top-0 z-50 relative">

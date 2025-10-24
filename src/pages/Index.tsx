@@ -10,18 +10,23 @@ const Index = () => {
 
   return (
     <main className="min-h-screen relative overflow-hidden">
-      {/* Optimized Beautiful Background */}
+      {/* Multi-layer Optimized Background */}
       <div className="absolute inset-0">
         <div 
-          className="absolute inset-0 bg-cover bg-center opacity-50"
+          className="absolute inset-0 bg-cover bg-center opacity-60"
           style={{ backgroundImage: `url(${heroGradientBg})` }}
         />
         <div 
-          className="absolute inset-0 opacity-15 bg-cover bg-center"
+          className="absolute inset-0 opacity-20 bg-cover bg-center"
           style={{ backgroundImage: `url(${patternBg})` }}
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-background/80 via-background/90 to-background" />
+        <div className="absolute inset-0 bg-gradient-to-b from-background/70 via-background/85 to-background" />
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5" />
       </div>
+      
+      {/* Subtle glow effect */}
+      <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-primary/5 rounded-full blur-3xl" />
+      <div className="absolute bottom-1/4 right-1/4 w-64 h-64 bg-accent/5 rounded-full blur-3xl" />
       
       {/* Content */}
       <div className="relative z-10 container mx-auto px-3 py-4 min-h-screen flex flex-col safe-top safe-bottom">
