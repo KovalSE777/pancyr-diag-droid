@@ -30,6 +30,7 @@ export class CapacitorBluetoothService {
   private bt: NativeBluetoothWrapper = new NativeBluetoothWrapper();
   private cyclicPollInterval: NodeJS.Timeout | null = null;
   private useNewProtocol = true; // Новый протокол (ASCII команды) по умолчанию
+  private receiveBuffer = new Uint8Array(0); // Буфер для накопления данных
   
   async initialize(): Promise<void> {
     // Инициализация не требуется для нативного плагина
@@ -64,14 +65,13 @@ export class CapacitorBluetoothService {
       
       // 1) КРИТИЧНО: подписываемся на данные ДО connect()
       this.bt.onBytes((chunk) => {
-        // Оптимизированное логирование - только в logService
         logService.info('BT-RX raw', `${formatBytes(chunk)} (len=${chunk.length})`);
         
         const hex = bytesToHex(chunk);
         this.addHexFrame('RX', hex);
         
-        // Парсим фреймы
-        this.parser.feed(chunk, (frame) => this.handleParsedFrame(frame));
+        // Обработка входящих данных с учётом нового протокола
+        this.handleIncomingData(chunk);
       });
       
       // Обработка потери соединения
@@ -79,6 +79,7 @@ export class CapacitorBluetoothService {
         logService.error('BT Serial', 'Connection lost - device disconnected');
         this.connectionEstablished = false;
         this.stopPeriodicRead();
+        this.stopCyclicPolling();
       });
       
       // 2) Подключаемся к устройству
@@ -109,17 +110,16 @@ export class CapacitorBluetoothService {
     
     if (this.deviceAddress) {
       try {
-        // Защита от быстрого переподключения - даем время на очистку
         const wasConnected = this.connectionEstablished;
         
         await this.bt.disconnect();
         this.deviceAddress = null;
         this.connectionEstablished = false;
         this.parser.clearBuffer();
+        this.receiveBuffer = new Uint8Array(0); // Очистка буфера
         this.hexFrames = [];
         this.latestData = null;
         
-        // Небольшая задержка перед следующим подключением
         if (wasConnected) {
           await new Promise(resolve => setTimeout(resolve, 500));
         }
@@ -190,22 +190,81 @@ export class CapacitorBluetoothService {
     }
   }
 
-  private handleParsedFrame(frame: ParsedFrame): void {
-    const hex = [...frame.raw].map(b => b.toString(16).padStart(2, '0')).join(' ').toUpperCase();
-    
-    // Попытка парсинга нового протокола
+  /**
+   * Обработка входящих данных (с буферизацией)
+   */
+  private handleIncomingData(chunk: Uint8Array): void {
     if (this.useNewProtocol) {
-      const packet = parseBskuPacket(frame.raw);
+      // Новый протокол: накапливаем в буфере
+      const newBuffer = new Uint8Array(this.receiveBuffer.length + chunk.length);
+      newBuffer.set(this.receiveBuffer, 0);
+      newBuffer.set(chunk, this.receiveBuffer.length);
+      this.receiveBuffer = newBuffer;
       
-      if (packet) {
-        this.handleBskuPacket(packet);
-        return;
+      // Пытаемся найти и распарсить пакеты с заголовком 0xFF
+      this.tryParseNewProtocolPackets();
+    } else {
+      // Альтернативный режим: используем старый парсер
+      this.parser.feed(chunk, (frame) => this.handleParsedFrameLegacy(frame));
+    }
+  }
+
+  /**
+   * Попытка распарсить пакеты нового протокола из буфера
+   */
+  private tryParseNewProtocolPackets(): void {
+    // Ищем заголовок 0xFF в буфере
+    let foundHeader = false;
+    let headerStart = -1;
+    
+    for (let i = 0; i < this.receiveBuffer.length - 7; i++) {
+      // Проверяем на наличие как минимум 4-х байт 0xFF подряд
+      if (this.receiveBuffer[i] === 0xFF &&
+          this.receiveBuffer[i + 1] === 0xFF &&
+          this.receiveBuffer[i + 2] === 0xFF &&
+          this.receiveBuffer[i + 3] === 0xFF) {
+        foundHeader = true;
+        headerStart = i;
+        break;
       }
-      
-      logService.warn('BT-RX', 'New protocol parse failed, trying legacy...');
     }
     
-    // Fallback на старый парсер
+    if (!foundHeader) {
+      // Заголовок не найден, очищаем буфер если он слишком большой
+      if (this.receiveBuffer.length > 200) {
+        logService.warn('BT-RX', 'Buffer overflow, clearing...');
+        this.receiveBuffer = new Uint8Array(0);
+      }
+      return;
+    }
+    
+    // Нашли заголовок, пытаемся распарсить пакет
+    const packet = parseBskuPacket(this.receiveBuffer.slice(headerStart));
+    
+    if (packet) {
+      logService.success('BT-RX', `Parsed BSKU packet: type=${packet.type}`);
+      this.handleBskuPacket(packet);
+      
+      // Удаляем распарсенную часть из буфера
+      // Грубая оценка: заголовок (7) + тип (1) + данные (~30) = ~40 байт
+      const estimatedPacketSize = 40;
+      this.receiveBuffer = this.receiveBuffer.slice(headerStart + estimatedPacketSize);
+    } else {
+      // Не удалось распарсить, может данные ещё не полностью получены
+      // Ждём больше данных, но сохраняем только с заголовка
+      this.receiveBuffer = this.receiveBuffer.slice(headerStart);
+      
+      // Если буфер слишком большой, что-то не так
+      if (this.receiveBuffer.length > 100) {
+        logService.warn('BT-RX', 'Failed to parse packet, clearing buffer');
+        this.receiveBuffer = new Uint8Array(0);
+      }
+    }
+  }
+
+  private handleParsedFrameLegacy(frame: ParsedFrame): void {
+    const hex = [...frame.raw].map(b => b.toString(16).padStart(2, '0')).join(' ').toUpperCase();
+    
     logService.info('BT-RX frame', `Type=${frame.type}, CHK=${frame.ok ? 'OK' : 'FAIL'}, Info=${JSON.stringify(frame.info ?? {})}, Hex=${hex}`);
     
     if (frame.type === 'UDS_80P') {
