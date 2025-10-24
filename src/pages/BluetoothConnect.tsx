@@ -204,40 +204,39 @@ const BluetoothConnect = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background relative overflow-hidden">
-      {/* Premium Background */}
+    <div className="min-h-screen bg-background relative overflow-hidden safe-top safe-bottom">
+      {/* Lightweight Background */}
       <div className="absolute inset-0">
         <div className="absolute inset-0 opacity-10 bg-cover bg-center" style={{ backgroundImage: `url(${patternBg})` }} />
-        <div className="absolute inset-0 bg-gradient-to-b from-background via-background/95 to-background" />
+        <div className="absolute inset-0 bg-gradient-to-b from-background/90 to-background" />
       </div>
-      <div className="absolute top-1/3 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-[100px] animate-pulse" />
       
       {/* Header */}
       <header className="glass-header sticky top-0 z-50 relative">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+        <div className="container mx-auto px-3 py-3 flex items-center justify-between">
           <Button 
             variant="ghost" 
             onClick={() => navigate(-1)}
-            className="text-foreground hover:text-primary"
+            className="text-foreground hover:text-primary -ml-2"
+            size="sm"
           >
-            <ArrowLeft className="mr-2 h-4 w-4" />
+            <ArrowLeft className="mr-1 h-4 w-4" />
             Назад
           </Button>
-          <h1 className="text-3xl font-black gradient-text">Подключение</h1>
-          <div className="w-24" />
+          <h1 className="text-2xl font-black gradient-text">Подключение</h1>
+          <div className="w-16" />
         </div>
       </header>
 
-      <main className="relative container mx-auto px-4 py-12 max-w-2xl safe-bottom pb-24">
-        {/* Connection Status Card */}
-        <Card className="premium-card p-12 mb-8 animate-fade-in">
-          <div className="flex flex-col items-center text-center space-y-6">
-            <div className="relative w-52 h-52 flex items-center justify-center">
-              <div className="absolute inset-0 bg-primary/20 rounded-full blur-3xl animate-pulse" />
+      <main className="relative container mx-auto px-3 py-4 max-w-xl pb-20">
+        {/* Compact Connection Status */}
+        <Card className="premium-card p-6 mb-4">
+          <div className="flex flex-col items-center text-center space-y-4">
+            <div className="relative w-32 h-32 flex items-center justify-center">
               <img 
                 src={bluetoothPremiumIcon} 
                 alt="Bluetooth" 
-                className={`relative w-full h-full object-contain transition-all duration-500 drop-shadow-2xl ${
+                className={`relative w-full h-full object-contain ${
                   connectionStatus === 'connected' ? 'scale-110' : ''
                 }`}
               />
@@ -245,71 +244,65 @@ const BluetoothConnect = () => {
             
             <div className="space-y-2">
               {getStatusIcon()}
-              <h2 className="text-3xl font-bold text-foreground">{getStatusText()}</h2>
-              <p className="text-muted-foreground">
-                {connectionStatus === 'idle' && 'Нажмите кнопку для подключения к БСКУ'}
-                {connectionStatus === 'searching' && 'Ищем доступные устройства...'}
-                {connectionStatus === 'connecting' && 'Устанавливаем соединение...'}
-                {connectionStatus === 'connected' && 'Переход к диагностике...'}
-                {connectionStatus === 'error' && 'Проверьте Bluetooth на БСКУ и повторите попытку'}
+              <h2 className="text-xl font-bold text-foreground">{getStatusText()}</h2>
+              <p className="text-xs text-muted-foreground">
+                {connectionStatus === 'idle' && 'Подключитесь к БСКУ'}
+                {connectionStatus === 'searching' && 'Поиск устройств...'}
+                {connectionStatus === 'connecting' && 'Соединение...'}
+                {connectionStatus === 'connected' && 'Готово!'}
+                {connectionStatus === 'error' && 'Проверьте Bluetooth'}
               </p>
             </div>
 
             {!isConnected && !isConnecting && (
               <Button 
                 onClick={handleConnect}
-                className="w-full max-w-xs btn-glow-primary bg-primary hover:bg-primary-glow font-semibold text-base sm:text-lg py-7 rounded-xl shadow-lg transition-all duration-300 hover:scale-105 min-h-[56px]"
+                className="w-full bg-primary hover:bg-primary/90 font-semibold text-sm py-5 rounded-lg transition-colors min-h-[48px]"
               >
-                <Bluetooth className="mr-2 h-5 w-5" />
-                Подключиться к БСКУ
+                <Bluetooth className="mr-2 h-4 w-4" />
+                Подключиться
               </Button>
             )}
           </div>
         </Card>
 
-        {/* Instructions */}
-        <Card className="glass-card p-8 mb-6 animate-fade-in [animation-delay:200ms]">
-          <h3 className="text-xl font-bold mb-6 text-foreground">Инструкция по подключению</h3>
-          <ol className="space-y-3 text-sm text-muted-foreground">
-            <li className="flex gap-3">
-              <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/20 text-primary flex items-center justify-center text-xs font-bold">
+        {/* Compact Instructions */}
+        <Card className="glass-card p-4 mb-3">
+          <h3 className="text-sm font-bold mb-3 text-foreground">Инструкция</h3>
+          <ol className="space-y-2 text-xs text-muted-foreground">
+            <li className="flex gap-2">
+              <span className="flex-shrink-0 w-5 h-5 rounded-full bg-primary/20 text-primary flex items-center justify-center text-xs font-bold">
                 1
               </span>
-              <span>Убедитесь, что БСКУ включен и на него подано питание 12/24В</span>
+              <span>БСКУ включен (12/24В)</span>
             </li>
-            <li className="flex gap-3">
-              <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/20 text-primary flex items-center justify-center text-xs font-bold">
+            <li className="flex gap-2">
+              <span className="flex-shrink-0 w-5 h-5 rounded-full bg-primary/20 text-primary flex items-center justify-center text-xs font-bold">
                 2
               </span>
-              <span>Включите Bluetooth на вашем устройстве</span>
+              <span>Bluetooth включен</span>
             </li>
-            <li className="flex gap-3">
-              <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/20 text-primary flex items-center justify-center text-xs font-bold">
+            <li className="flex gap-2">
+              <span className="flex-shrink-0 w-5 h-5 rounded-full bg-primary/20 text-primary flex items-center justify-center text-xs font-bold">
                 3
               </span>
-              <span>Нажмите кнопку "Подключиться к БСКУ"</span>
-            </li>
-            <li className="flex gap-3">
-              <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/20 text-primary flex items-center justify-center text-xs font-bold">
-                4
-              </span>
-              <span>В появившемся окне выберите устройство "Pantsir" или "BSKU"</span>
+              <span>Выберите "Pantsir" или "BSKU"</span>
             </li>
           </ol>
         </Card>
 
-        {/* Demo Mode */}
-        <Card className="glass-card p-8 animate-fade-in [animation-delay:300ms]">
-          <div className="flex flex-col items-center text-center space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Для тестирования без реального устройства
+        {/* Compact Demo Mode */}
+        <Card className="glass-card p-4">
+          <div className="flex flex-col items-center text-center space-y-2">
+            <p className="text-xs text-muted-foreground">
+              Тест без устройства
             </p>
             <Button 
               variant="outline" 
               onClick={handleUseMockData}
-              className="border-accent/50 text-accent hover:bg-accent/20 hover:border-accent font-semibold"
+              className="border-accent/50 text-accent hover:bg-accent/20 text-sm py-4 w-full"
             >
-              Использовать демо-данные
+              Демо-данные
             </Button>
           </div>
         </Card>

@@ -127,13 +127,13 @@ All colors MUST be HSL.
 }
 
 @layer components {
-  /* Premium glassmorphism effects */
+  /* Lightweight card effects - no blur for performance */
   .glass-card {
-    @apply bg-card/80 backdrop-blur-xl border border-border/50;
+    @apply bg-card/95 border border-border/50;
   }
   
   .glass-header {
-    @apply bg-card/60 backdrop-blur-2xl border-b border-border/50;
+    @apply bg-card/95 border-b border-border/50;
   }
   
   /* Premium button hover effects */
@@ -145,12 +145,11 @@ All colors MUST be HSL.
     @apply shadow-[0_0_20px_hsl(var(--secondary)/0.3)] hover:shadow-[0_0_40px_hsl(var(--secondary)/0.5)];
   }
   
-  /* Premium card styles */
+  /* Lightweight card styles */
   .premium-card {
-    @apply bg-gradient-to-br from-card via-card/95 to-card/90 backdrop-blur-sm;
-    @apply border border-border/70 shadow-[0_10px_40px_-10px_hsl(220_50%_5%/0.5)];
-    @apply hover:border-primary/50 hover:shadow-[0_20px_60px_-15px_hsl(var(--primary)/0.3)];
-    @apply transition-all duration-500;
+    @apply bg-card border border-border/70;
+    @apply hover:border-primary/50;
+    @apply transition-colors duration-300;
   }
   
   /* Animated gradient text */

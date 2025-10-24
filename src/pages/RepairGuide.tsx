@@ -298,38 +298,39 @@ const RepairGuide = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-20 relative overflow-hidden">
+    <div className="min-h-screen bg-background pb-16 relative overflow-hidden safe-top safe-bottom">
       <div className="absolute inset-0 opacity-10 bg-cover bg-center" style={{ backgroundImage: `url(${patternBg})` }} />
-      <div className="absolute inset-0 bg-gradient-to-b from-background via-background/95 to-background" />
-      {/* Header */}
+      <div className="absolute inset-0 bg-gradient-to-b from-background/90 to-background" />
+      {/* Compact Header */}
       <header className="glass-header sticky top-0 z-50 relative">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between mb-4">
+        <div className="container mx-auto px-3 py-3">
+          <div className="flex items-center justify-between mb-3">
             <Button 
               variant="ghost" 
               onClick={() => navigate(-1)}
-              className="text-foreground hover:text-primary"
+              className="text-foreground hover:text-primary -ml-2"
+              size="sm"
             >
-              <ArrowLeft className="mr-2 h-4 w-4" />
+              <ArrowLeft className="mr-1 h-4 w-4" />
               Назад
             </Button>
-            <h1 className="text-3xl font-black gradient-text">База знаний</h1>
-            <div className="w-24" />
+            <h1 className="text-2xl font-black gradient-text">База знаний</h1>
+            <div className="w-16" />
           </div>
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
             <Input
               type="text"
-              placeholder="Поиск по симптомам или названию..."
+              placeholder="Поиск..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 glass-card border-border/50 focus-ring-primary text-base"
+              className="pl-9 glass-card border-border/50 text-sm h-10"
             />
           </div>
         </div>
       </header>
 
-      <main className="relative container mx-auto px-4 py-6 space-y-8 safe-bottom pb-24">
+      <main className="relative container mx-auto px-3 py-3 space-y-4 pb-20">
         {filteredRepairs.length === 0 ? (
           <Card className="premium-card p-16 text-center">
             <AlertTriangle className="w-16 h-16 text-muted-foreground mx-auto mb-4 opacity-50" />
