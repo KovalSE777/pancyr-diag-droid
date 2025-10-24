@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ArrowLeft, Search, Wrench, AlertTriangle, CheckCircle2, Fan, Zap, Thermometer } from "lucide-react";
 import { useState } from "react";
+import patternBg from "@/assets/pattern-bg.jpg";
 
 interface RepairItem {
   id: string;
@@ -297,9 +298,11 @@ const RepairGuide = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-20">
+    <div className="min-h-screen bg-background pb-20 relative overflow-hidden">
+      <div className="absolute inset-0 opacity-10 bg-cover bg-center" style={{ backgroundImage: `url(${patternBg})` }} />
+      <div className="absolute inset-0 bg-gradient-to-b from-background via-background/95 to-background" />
       {/* Header */}
-      <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
+      <header className="glass-header sticky top-0 z-50 relative">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between mb-4">
             <Button 
@@ -310,7 +313,7 @@ const RepairGuide = () => {
               <ArrowLeft className="mr-2 h-4 w-4" />
               Назад
             </Button>
-            <h1 className="text-2xl font-bold text-foreground">База знаний</h1>
+            <h1 className="text-3xl font-black gradient-text">База знаний</h1>
             <div className="w-24" />
           </div>
           <div className="relative">
@@ -320,13 +323,13 @@ const RepairGuide = () => {
               placeholder="Поиск по симптомам или названию..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 bg-background border-border"
+              className="pl-10 glass-card border-border/50 focus-ring-primary text-base"
             />
           </div>
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-6 space-y-8">
+      <main className="relative container mx-auto px-4 py-6 space-y-8">
         {filteredRepairs.length === 0 ? (
           <Card className="p-12 text-center bg-card border-border">
             <p className="text-muted-foreground">Ничего не найдено. Попробуйте другой запрос.</p>

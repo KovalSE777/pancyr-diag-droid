@@ -5,7 +5,8 @@ import { ArrowLeft, Bluetooth, Loader2, CheckCircle2, AlertCircle, Wrench } from
 import { useState, useEffect, useRef } from "react";
 import { capacitorBluetoothService } from "@/utils/capacitor-bluetooth";
 import { useToast } from "@/hooks/use-toast";
-import bluetoothIcon from "@/assets/bluetooth-icon.png";
+import bluetoothPremiumIcon from "@/assets/bluetooth-premium-icon.png";
+import patternBg from "@/assets/pattern-bg.jpg";
 import { Capacitor } from "@capacitor/core";
 import { BluetoothSerial } from '@/utils/native-bluetooth';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -203,9 +204,16 @@ const BluetoothConnect = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background relative overflow-hidden">
+      {/* Premium Background */}
+      <div className="absolute inset-0">
+        <div className="absolute inset-0 opacity-10 bg-cover bg-center" style={{ backgroundImage: `url(${patternBg})` }} />
+        <div className="absolute inset-0 bg-gradient-to-b from-background via-background/95 to-background" />
+      </div>
+      <div className="absolute top-1/3 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-[100px] animate-pulse" />
+      
       {/* Header */}
-      <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
+      <header className="glass-header sticky top-0 z-50 relative">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <Button 
             variant="ghost" 
@@ -215,7 +223,7 @@ const BluetoothConnect = () => {
             <ArrowLeft className="mr-2 h-4 w-4" />
             Назад
           </Button>
-          <h1 className="text-2xl font-bold text-foreground">Подключение</h1>
+          <h1 className="text-3xl font-black gradient-text">Подключение</h1>
           <Button
             variant="ghost"
             onClick={() => navigate('/ble-debug')}
@@ -227,15 +235,16 @@ const BluetoothConnect = () => {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-12 max-w-2xl">
+      <main className="relative container mx-auto px-4 py-12 max-w-2xl">
         {/* Connection Status Card */}
-        <Card className="p-12 bg-card border-border mb-8 animate-fade-in">
+        <Card className="premium-card p-12 mb-8 animate-fade-in">
           <div className="flex flex-col items-center text-center space-y-6">
-            <div className="w-48 h-48 flex items-center justify-center">
+            <div className="relative w-52 h-52 flex items-center justify-center">
+              <div className="absolute inset-0 bg-primary/20 rounded-full blur-3xl animate-pulse" />
               <img 
-                src={bluetoothIcon} 
+                src={bluetoothPremiumIcon} 
                 alt="Bluetooth" 
-                className={`w-full h-full object-contain transition-all duration-500 ${
+                className={`relative w-full h-full object-contain transition-all duration-500 drop-shadow-2xl ${
                   connectionStatus === 'connected' ? 'scale-110' : ''
                 }`}
               />
@@ -256,7 +265,7 @@ const BluetoothConnect = () => {
             {!isConnected && !isConnecting && (
               <Button 
                 onClick={handleConnect}
-                className="w-full max-w-xs bg-primary hover:bg-primary-glow text-lg py-6"
+                className="w-full max-w-xs btn-glow-primary bg-primary hover:bg-primary-glow font-semibold text-lg py-7 rounded-xl shadow-lg transition-all duration-300 hover:scale-105"
               >
                 <Bluetooth className="mr-2 h-5 w-5" />
                 Подключиться к БСКУ
@@ -266,8 +275,8 @@ const BluetoothConnect = () => {
         </Card>
 
         {/* Instructions */}
-        <Card className="p-6 bg-card border-border mb-6 animate-fade-in [animation-delay:200ms]">
-          <h3 className="text-lg font-semibold mb-4 text-foreground">Инструкция по подключению</h3>
+        <Card className="glass-card p-8 mb-6 animate-fade-in [animation-delay:200ms]">
+          <h3 className="text-xl font-bold mb-6 text-foreground">Инструкция по подключению</h3>
           <ol className="space-y-3 text-sm text-muted-foreground">
             <li className="flex gap-3">
               <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/20 text-primary flex items-center justify-center text-xs font-bold">
@@ -297,7 +306,7 @@ const BluetoothConnect = () => {
         </Card>
 
         {/* Demo Mode */}
-        <Card className="p-6 bg-muted border-border animate-fade-in [animation-delay:300ms]">
+        <Card className="glass-card p-8 animate-fade-in [animation-delay:300ms]">
           <div className="flex flex-col items-center text-center space-y-4">
             <p className="text-sm text-muted-foreground">
               Для тестирования без реального устройства
