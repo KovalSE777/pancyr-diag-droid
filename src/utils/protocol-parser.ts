@@ -26,7 +26,7 @@ export interface ParsedFrame {
  * Тип пакета от БСКУ (новый протокол)
  */
 export enum BskuPacketType {
-  TELEMETRY = 0x01,      // Телеметрия
+  TELEMETRY = 0x88,      // Телеметрия (38 байт)
   SCREEN_CHANGE = 0x66,  // Смена экрана "SCR_" + id
   CONFIGURATION = 0x77,  // Конфигурационный пакет
   UNKNOWN = 0xFF

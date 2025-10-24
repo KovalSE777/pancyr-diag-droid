@@ -120,15 +120,28 @@ export class CapacitorBluetoothService {
    * Не нужно отправлять циклический опрос - БСКУ шлет данные каждые ~200ms
    */
   private async startCommunication(): Promise<void> {
-    logService.info('BT Serial', '🚀 Starting communication - waiting for data from BSKU...');
-    logService.info('BT Serial', '📡 BSKU will send data automatically (no polling needed)');
+    logService.info('BT Serial', '🚀 Starting communication sequence');
     
-    // БСКУ сам начинает отправлять данные после подключения!
-    // Приложение только слушает и обрабатывает входящие пакеты:
+    // 1. Отправить UCONF (запрос конфигурации)
+    const uconfPacket = buildUCONF();
+    await this.sendRaw(uconfPacket);
+    logService.info('BT-TX', '📤 Sent UCONF (5 bytes)');
+    
+    await new Promise(resolve => setTimeout(resolve, 200));
+    
+    // 2. Отправить UOKS для экрана 4 (hardcoded как в оригинале)
+    const uoksPacket = buildUOKS(4);
+    await this.sendRaw(uoksPacket);
+    logService.info('BT-TX', '📤 Sent UOKS(4) (7 bytes)');
+    
+    await new Promise(resolve => setTimeout(resolve, 300));
+    
+    // 3. БСКУ начнет отправлять данные автоматически
+    // Приложение обрабатывает входящие пакеты:
     // - 0x88 = телеметрия (каждые ~200ms)
-    // - 0x66 = команда смены экрана (на которую отвечаем UOKS)
+    // - 0x66 = команда смены экрана (отвечаем UOKS)
     
-    logService.info('BT Serial', '✅ Ready to receive data from BSKU');
+    logService.info('BT Serial', '✅ Initialization complete, ready to receive data');
   }
 
   // ❌ УДАЛЕНО: Циклический опрос больше не нужен!
