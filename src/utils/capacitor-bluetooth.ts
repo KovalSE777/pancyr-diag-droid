@@ -22,7 +22,7 @@ export class CapacitorBluetoothService {
   private hexFrames: HexFrame[] = [];
   private onFramesUpdate?: (frames: HexFrame[]) => void;
   private bt: NativeBluetoothWrapper = new NativeBluetoothWrapper();
-  private cyclicPollInterval: NodeJS.Timeout | null = null;
+  // ❌ УДАЛЕНО: cyclicPollInterval - больше не нужен!
   private receiveBuffer = new Uint8Array(0); // Буфер для накопления данных
   
   async initialize(): Promise<void> {
@@ -70,7 +70,7 @@ export class CapacitorBluetoothService {
       // Обработка потери соединения
       this.bt.onConnectionLost(() => {
         logService.error('BT Serial', 'Connection lost - device disconnected');
-        this.stopCyclicPolling();
+        // Циклический опрос больше не используется
       });
       
       // 2) Подключаемся к устройству
@@ -94,8 +94,6 @@ export class CapacitorBluetoothService {
   // Больше не нужен - данные приходят через listener нативного плагина
 
   async disconnect(): Promise<void> {
-    this.stopCyclicPolling();
-    
     if (this.deviceAddress) {
       try {
         await this.bt.disconnect();
@@ -133,41 +131,8 @@ export class CapacitorBluetoothService {
     logService.info('BT Serial', '✅ Ready to receive data from BSKU');
   }
 
-  /**
-   * Циклический опрос (новый протокол)
-   * Отправляет 38-байтный пакет опроса телеметрии каждые 500ms
-   * БСКУ отвечает пакетом телеметрии с заголовком 0xFF
-   */
-  private startCyclicPolling(): void {
-    // Остановить предыдущий таймер если есть
-    this.stopCyclicPolling();
-    
-    // Запустить новый таймер циклического опроса
-    this.cyclicPollInterval = setInterval(async () => {
-      if (!this.isConnected()) {
-        logService.warn('BT Serial', 'Not connected, skipping cyclic poll');
-        return;
-      }
-      
-      try {
-        const pollPacket = buildCyclicPoll();
-        await this.sendRaw(pollPacket);
-        logService.info('BT Serial', '🔄 Cyclic poll sent (38 bytes)');
-      } catch (error) {
-        logService.error('BT Serial', `Cyclic poll error: ${error}`);
-      }
-    }, BT_TIMING.PERIODIC_READ_INTERVAL); // 500ms
-    
-    logService.info('BT Serial', `⏰ Cyclic polling started (${BT_TIMING.PERIODIC_READ_INTERVAL}ms interval)`);
-  }
-
-  private stopCyclicPolling(): void {
-    if (this.cyclicPollInterval) {
-      clearInterval(this.cyclicPollInterval);
-      this.cyclicPollInterval = null;
-      logService.info('BT Serial', '⏸️  Cyclic polling stopped');
-    }
-  }
+  // ❌ УДАЛЕНО: Циклический опрос больше не нужен!
+  // БСКУ сам отправляет данные каждые ~200ms (телеметрия 0x88)
 
   /**
    * Обработка входящих данных (с буферизацией)
