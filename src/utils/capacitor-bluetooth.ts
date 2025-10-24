@@ -136,25 +136,39 @@ export class CapacitorBluetoothService {
 
   /**
    * Инициализация соединения (новый протокол)
+   * Последовательность:
+   * 1. Пауза 200ms для стабилизации
+   * 2. Отправить UCONF (запрос конфигурации)
+   * 3. Подождать ответа от БСКУ (0x66 или телеметрия)
+   * 4. Через 500ms запустить циклический опрос
    */
   private async startCommunication(): Promise<void> {
     if (this.useNewProtocol) {
       logService.info('BT Serial', '🚀 Starting NEW protocol (ASCII commands)');
       
-      // 1. Отправить UCONF
-      logService.info('BT Serial', '📤 Sending UCONF...');
+      // 1. Небольшая задержка после подключения для стабилизации
+      await new Promise(resolve => setTimeout(resolve, BT_TIMING.CONNECTION_STABILIZATION_DELAY));
+      
+      // 2. Отправить UCONF
+      logService.info('BT Serial', '📤 Sending UCONF (request configuration)...');
       const uconfPacket = buildUCONF();
       await this.sendRaw(uconfPacket);
       
-      // 2. Подождать ответа (обрабатывается в onBytes)
+      // 3. Дождаться ответа от БСКУ
+      // Ответ может быть:
+      //   - Фрейм 0x66 (SCREEN_CHANGE) → отправим UOKS
+      //   - Фрейм 0x77 (CONFIGURATION) → отправим UOKP
+      //   - Или сразу телеметрия
+      // Обрабатывается в handleIncomingData() через onBytes listener
+      
       await new Promise(resolve => setTimeout(resolve, 500));
       
-      // 3. Запустить циклический опрос
+      // 4. Запустить циклический опрос телеметрии
       this.startCyclicPolling();
       
-      logService.success('BT Serial', '✅ NEW protocol started');
+      logService.success('BT Serial', '✅ NEW protocol communication sequence started');
     } else {
-      // Альтернативный режим - прямое управление
+      // Альтернативный режим - прямое управление (резервный)
       logService.info('BT Serial', '🔄 Using ALTERNATIVE protocol (Direct Control)');
       await this.sendDirectControlPoll();
       this.startPeriodicRead();
@@ -163,23 +177,30 @@ export class CapacitorBluetoothService {
 
   /**
    * Циклический опрос (новый протокол)
+   * Отправляет 38-байтный пакет опроса телеметрии каждые 500ms
+   * БСКУ отвечает пакетом телеметрии с заголовком 0xFF
    */
   private startCyclicPolling(): void {
+    // Остановить предыдущий таймер если есть
     this.stopCyclicPolling();
     
+    // Запустить новый таймер циклического опроса
     this.cyclicPollInterval = setInterval(async () => {
-      if (!this.isConnected()) return;
+      if (!this.isConnected()) {
+        logService.warn('BT Serial', 'Not connected, skipping cyclic poll');
+        return;
+      }
       
       try {
         const pollPacket = buildCyclicPoll();
         await this.sendRaw(pollPacket);
-        logService.info('BT Serial', '🔄 Cyclic poll sent');
+        logService.info('BT Serial', '🔄 Cyclic poll sent (38 bytes)');
       } catch (error) {
         logService.error('BT Serial', `Cyclic poll error: ${error}`);
       }
-    }, 500);
+    }, BT_TIMING.PERIODIC_READ_INTERVAL); // 500ms
     
-    logService.info('BT Serial', '⏰ Cyclic polling started (500ms)');
+    logService.info('BT Serial', `⏰ Cyclic polling started (${BT_TIMING.PERIODIC_READ_INTERVAL}ms interval)`);
   }
 
   private stopCyclicPolling(): void {
@@ -305,9 +326,10 @@ export class CapacitorBluetoothService {
 
   /**
    * Обработка пакета нового протокола
+   * Вызывается когда parseBskuPacket успешно распарсил пакет
    */
   private async handleBskuPacket(packet: BskuPacket): Promise<void> {
-    logService.info('BT-RX BSKU', `Type=${packet.type}, ScreenId=${packet.screenId}, PktId=${packet.pktId}`);
+    logService.info('BT-RX BSKU', `📦 Packet: Type=${packet.type}, ScreenId=${packet.screenId ?? 'N/A'}, PktId=${packet.pktId ?? 'N/A'}`);
     
     switch (packet.type) {
       case BskuPacketType.SCREEN_CHANGE:
@@ -327,36 +349,65 @@ export class CapacitorBluetoothService {
     }
   }
 
+  /**
+   * Обработка фрейма смены экрана (0x66)
+   * Формат: 0xFF...0xFF 0x66 "SCR_" + screenId
+   * Ответ: UOKS + screenId
+   */
   private async handleScreenChange(packet: BskuPacket): Promise<void> {
-    logService.info('BT-RX BSKU', `🖥️  Screen change: ${packet.screenId}`);
+    logService.info('BT-RX BSKU', `🖥️  Screen change detected: Screen ${packet.screenId}`);
     
     if (packet.screenId !== undefined) {
+      // Отправить подтверждение UOKS
       const uoksPacket = buildUOKS(packet.screenId);
       await this.sendRaw(uoksPacket);
-      logService.success('BT-TX', `✅ Sent UOKS for screen ${packet.screenId}`);
+      logService.success('BT-TX', `✅ Sent UOKS acknowledgment for screen ${packet.screenId}`);
+    } else {
+      logService.error('BT-RX BSKU', 'Screen change packet missing screenId');
     }
   }
 
+  /**
+   * Обработка конфигурационного пакета (0x77)
+   * Формат: 0xFF...0xFF 0x77 pktId + конфигурация
+   * Ответ: UOKP + pktId
+   */
   private async handleConfiguration(packet: BskuPacket): Promise<void> {
-    logService.info('BT-RX BSKU', `⚙️  Configuration packet: ${packet.pktId}`);
+    logService.info('BT-RX BSKU', `⚙️  Configuration packet received: Packet ${packet.pktId}`);
     
     if (packet.pktId !== undefined) {
+      // Отправить подтверждение UOKP
       const uokpPacket = buildUOKP(packet.pktId);
       await this.sendRaw(uokpPacket);
-      logService.success('BT-TX', `✅ Sent UOKP for packet ${packet.pktId}`);
+      logService.success('BT-TX', `✅ Sent UOKP acknowledgment for packet ${packet.pktId}`);
+      
+      // TODO: Обработать конфигурационные данные если нужно
+      // packet.data содержит конфигурацию после pktId
+    } else {
+      logService.error('BT-RX BSKU', 'Configuration packet missing pktId');
     }
   }
 
+  /**
+   * Обработка телеметрии
+   * Формат: 0xFF...0xFF screenId + данные телеметрии
+   * Парсится через Screen4Parser
+   */
   private handleTelemetry(packet: BskuPacket): void {
-    logService.info('BT-RX BSKU', `📊 Telemetry data (screen ${packet.screenId})`);
+    logService.info('BT-RX BSKU', `📊 Telemetry data received (screen ${packet.screenId ?? 'unknown'})`);
     
+    // Парсить телеметрию через Screen4Parser
     const diagnosticData = Screen4Parser.parse(packet.data, this.systemType);
     
     if (diagnosticData) {
       this.latestData = diagnosticData;
-      logService.success('BT-RX', '✅ Telemetry parsed (NEW protocol)');
+      logService.success('BT-RX', '✅ Telemetry parsed successfully (NEW protocol)');
+      
+      // Уведомить UI об обновлении данных (если реализовано)
+      // this.notifyDataListeners(diagnosticData);
     } else {
-      logService.error('BT-RX', 'Failed to parse telemetry');
+      logService.error('BT-RX', 'Failed to parse telemetry data');
+      logService.info('BT-RX', `Raw data length: ${packet.data.length} bytes`);
     }
   }
 

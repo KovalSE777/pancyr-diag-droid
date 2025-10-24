@@ -69,14 +69,15 @@ export function buildUCONF(): Uint8Array {
  * @param screenId - номер экрана (0x01-0xFF)
  * 
  * ВАЖНО: screenId это БАЙТ (0x04), а не ASCII-символ '4' (0x34)
+ * Формат: ASCII "UOKS" (4 байта) + screenId (1 байт) = 5 байт
  */
 export function buildUOKS(screenId: number): Uint8Array {
   const encoder = new TextEncoder();
   const command = encoder.encode('UOKS');
   
   const packet = new Uint8Array(5);
-  packet.set(command, 0);
-  packet[4] = screenId & 0xFF;
+  packet.set(command, 0);  // 'U','O','K','S'
+  packet[4] = screenId & 0xFF;  // Сырой байт, НЕ ASCII
   
   return packet;
 }
@@ -84,55 +85,47 @@ export function buildUOKS(screenId: number): Uint8Array {
 /**
  * UOKP - Подтверждение пакета конфигурации
  * Отправляется в ответ на фрейм 0x77 от БСКУ
- * @param pktId - номер пакета конфигурации
+ * @param pktId - номер пакета конфигурации (0x01-0xFF)
+ * 
+ * Формат: ASCII "UOKP" (4 байта) + pktId (1 байт) = 5 байт
  */
 export function buildUOKP(pktId: number): Uint8Array {
   const encoder = new TextEncoder();
   const command = encoder.encode('UOKP');
   
   const packet = new Uint8Array(5);
-  packet.set(command, 0);
-  packet[4] = pktId & 0xFF;
+  packet.set(command, 0);  // 'U','O','K','P'
+  packet[4] = pktId & 0xFF;  // Сырой байт
   
   return packet;
 }
 
 /**
- * Циклический опрос телеметрии (38 байт)
+ * Циклический опрос телеметрии
  * Отправляется периодически (~200-1000ms)
+ * Формат: 38 байт из декомпилированного APK
  * 
- * Формат из логов оригинального приложения:
- * [0] = 0x44 (Header/Command ID)
- * [1] = 0x04
- * [2] = 0x07
- * [3-9] = 0x00
- * [10] = 0x4F (79 decimal)
- * [11-36] = данные (пока неизвестны точно)
- * [37] = контрольная сумма
+ * Структура из анализа оригинального приложения:
+ * [0]    = 0x44 (68 decimal) - Header/Command ID
+ * [1]    = 0x04 (4)          - Sub-command или длина
+ * [2]    = 0x07 (7)          - Параметр
+ * [3-9]  = 0x00              - Данные опроса (нули)
+ * [10]   = 0x4F (79 decimal) - Маркер
+ * [11-36]= 0x00              - Резерв
+ * [37]   = Checksum (sum8)   - Контрольная сумма
  */
 export function buildCyclicPoll(): Uint8Array {
   const packet = new Uint8Array(38);
   
-  // Из логов оригинального приложения
-  packet[0] = 0x44;  // 68 decimal - Header
-  packet[1] = 0x04;  // 4
-  packet[2] = 0x07;  // 7
-  packet[3] = 0x00;
-  packet[4] = 0x00;
-  packet[5] = 0x00;
-  packet[6] = 0x00;
-  packet[7] = 0x00;
-  packet[8] = 0x00;
-  packet[9] = 0x00;
-  packet[10] = 0x4F; // 79 decimal
+  // Заполнить известные байты из логов оригинального приложения
+  packet[0] = 0x44;  // 68 decimal - Command ID
+  packet[1] = 0x04;  // 4 - Sub-command
+  packet[2] = 0x07;  // 7 - Parameter
+  // [3-9] = 0x00 (уже инициализированы нулями)
+  packet[10] = 0x4F; // 79 decimal - Marker
+  // [11-36] = 0x00 (резерв, уже нули)
   
-  // Байты 11-36: пока оставляем нули
-  // TODO: Может потребоваться уточнение из реальных логов
-  for (let i = 11; i < 37; i++) {
-    packet[i] = 0x00;
-  }
-  
-  // Байт 37: Контрольная сумма
+  // Вычислить контрольную сумму (сумма первых 37 байт по модулю 256)
   let checksum = 0;
   for (let i = 0; i < 37; i++) {
     checksum = (checksum + packet[i]) & 0xFF;
@@ -143,35 +136,60 @@ export function buildCyclicPoll(): Uint8Array {
 }
 
 /**
- * Парсер пакетов от БСКУ (новый протокол с 0xFF заголовками)
- * Формат: 0xFF × N (заголовок) + тип/screenId + данные
+ * Парсер пакетов от БСКУ (новый протокол)
+ * 
+ * Формат пакета:
+ * - Заголовок: 0xFF × N (обычно 4-7 байт)
+ * - Тип/ScreenId: 1 байт
+ *   - 0x66 = SCREEN_CHANGE (фрейм смены экрана)
+ *   - 0x77 = CONFIGURATION (конфигурационный пакет)
+ *   - Другие = TELEMETRY (номер экрана телеметрии)
+ * - Данные: остальные байты
+ * 
+ * @param rawData - сырые данные от устройства
+ * @returns распарсенный пакет или null если не удалось распарсить
  */
 export function parseBskuPacket(rawData: Uint8Array): BskuPacket | null {
-  if (rawData.length < 8) {
-    console.warn('Packet too short:', rawData.length);
+  // Минимальная длина: заголовок (минимум 4 байта 0xFF) + тип (1 байт) = 5 байт
+  if (rawData.length < 5) {
+    console.warn('[parseBskuPacket] Packet too short:', rawData.length);
     return null;
   }
   
-  // Найти заголовок синхронизации (байты 0xFF)
-  let headerLength = 0;
-  for (let i = 0; i < Math.min(7, rawData.length); i++) {
-    if (rawData[i] === 0xFF) {
-      headerLength++;
-    } else {
+  // Найти начало заголовка синхронизации (последовательность 0xFF)
+  let headerPos = -1;
+  for (let i = 0; i <= rawData.length - 4; i++) {
+    if (rawData[i] === 0xFF && 
+        rawData[i + 1] === 0xFF && 
+        rawData[i + 2] === 0xFF && 
+        rawData[i + 3] === 0xFF) {
+      headerPos = i;
       break;
     }
   }
   
-  if (headerLength < 4) {
-    console.warn('Invalid header, expected 0xFF bytes, got:', headerLength);
-    // Попробуем всё равно распарсить
+  if (headerPos === -1) {
+    console.warn('[parseBskuPacket] Header 0xFF not found');
+    return null;
   }
   
-  // Байт после заголовка - тип/screenId
-  const typeOrScreenId = rawData[headerLength];
+  // Определить длину заголовка (сколько 0xFF подряд)
+  let headerLength = 0;
+  for (let i = headerPos; i < rawData.length && rawData[i] === 0xFF; i++) {
+    headerLength++;
+  }
   
-  // Данные (остальное после типа)
-  const data = rawData.slice(headerLength + 1);
+  // Проверить что есть байт типа после заголовка
+  if (headerPos + headerLength >= rawData.length) {
+    console.warn('[parseBskuPacket] No type byte after header');
+    return null;
+  }
+  
+  // Байт после заголовка - тип или screenId
+  const typeOrScreenId = rawData[headerPos + headerLength];
+  
+  // Данные (всё что после типа)
+  const data = rawData.slice(headerPos + headerLength + 1);
   
   // Определить тип пакета
   let type: BskuPacketType;
@@ -179,15 +197,32 @@ export function parseBskuPacket(rawData: Uint8Array): BskuPacket | null {
   let pktId: number | undefined;
   
   if (typeOrScreenId === 0x66) {
+    // Фрейм смены экрана: 0xFF...0xFF 0x66 "SCR_" + screenId
     type = BskuPacketType.SCREEN_CHANGE;
-    // Для 0x66 данные могут начинаться с "SCR_", затем screenId
-    // Или screenId сразу в следующем байте
-    screenId = data.length > 4 ? data[4] : data[0];
+    
+    // Парсить "SCR_" и извлечь screenId
+    // Ожидаем: data[0-3] = "SCR_" (ASCII), data[4] = screenId (байт)
+    if (data.length >= 5 && 
+        data[0] === 0x53 && // 'S'
+        data[1] === 0x43 && // 'C'
+        data[2] === 0x52 && // 'R'
+        data[3] === 0x5F) { // '_'
+      screenId = data[4];
+    } else {
+      console.warn('[parseBskuPacket] Invalid SCR_ format in 0x66 frame');
+    }
+    
   } else if (typeOrScreenId === 0x77) {
+    // Конфигурационный пакет: 0xFF...0xFF 0x77 pktId + конфигурация
     type = BskuPacketType.CONFIGURATION;
-    // Для 0x77 первый байт данных - pktId
-    pktId = data[0];
+    
+    // Первый байт данных - pktId
+    if (data.length >= 1) {
+      pktId = data[0];
+    }
+    
   } else {
+    // Телеметрия: 0xFF...0xFF screenId + данные
     type = BskuPacketType.TELEMETRY;
     screenId = typeOrScreenId;
   }
