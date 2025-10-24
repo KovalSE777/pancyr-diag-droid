@@ -284,13 +284,19 @@ const BluetoothConnect = () => {
               <span className="flex-shrink-0 w-5 h-5 rounded-full bg-primary/20 text-primary flex items-center justify-center text-xs font-bold">
                 2
               </span>
-              <span>Bluetooth включен</span>
+              <span>Включить Bluetooth на телефоне</span>
             </li>
             <li className="flex gap-2">
               <span className="flex-shrink-0 w-5 h-5 rounded-full bg-primary/20 text-primary flex items-center justify-center text-xs font-bold">
                 3
               </span>
-              <span>Выберите "Pantsir" или "BSKU"</span>
+              <span>Подключиться к БСКУ в настройках телефона</span>
+            </li>
+            <li className="flex gap-2">
+              <span className="flex-shrink-0 w-5 h-5 rounded-full bg-primary/20 text-primary flex items-center justify-center text-xs font-bold">
+                4
+              </span>
+              <span>Выбрать HC5 или JDY31 в приложении</span>
             </li>
           </ol>
         </Card>
