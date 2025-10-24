@@ -149,7 +149,7 @@ All colors MUST be HSL.
   .premium-card {
     @apply bg-gradient-to-br from-card via-card/95 to-card/90 backdrop-blur-sm;
     @apply border border-border/70 shadow-[0_10px_40px_-10px_hsl(220_50%_5%/0.5)];
-    @apply hover:border-primary/50 hover:shadow-[0_0_40px_hsl(var(--primary)/0.2)];
+    @apply hover:border-primary/50 hover:shadow-[0_20px_60px_-15px_hsl(var(--primary)/0.3)];
     @apply transition-all duration-500;
   }
   
@@ -168,5 +168,28 @@ All colors MUST be HSL.
   /* Premium focus rings */
   .focus-ring-primary {
     @apply focus:ring-4 focus:ring-primary/30 focus:outline-none;
+  }
+  
+  /* Smooth scroll */
+  html {
+    scroll-behavior: smooth;
+  }
+  
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    @apply bg-background;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    @apply bg-primary/30 rounded-full;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-primary/50;
   }
 }

@@ -90,7 +90,7 @@ const SystemSelect = () => {
         </div>
       </header>
 
-      <main className="relative container mx-auto px-4 py-12 space-y-10">
+      <main className="relative container mx-auto px-4 py-12 pb-20 space-y-10">
         
         {/* Premium System Info Card */}
         <Card className="premium-card p-10 animate-fade-in">

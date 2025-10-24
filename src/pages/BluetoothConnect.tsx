@@ -314,7 +314,7 @@ const BluetoothConnect = () => {
             <Button 
               variant="outline" 
               onClick={handleUseMockData}
-              className="border-accent text-accent hover:bg-accent hover:text-accent-foreground"
+              className="border-accent/50 text-accent hover:bg-accent/20 hover:border-accent font-semibold"
             >
               Использовать демо-данные
             </Button>
@@ -322,7 +322,6 @@ const BluetoothConnect = () => {
         </Card>
       </main>
 
-      {/* Device picker (Native) */}
       <Dialog open={devicePickerOpen} onOpenChange={(o) => { 
         setDevicePickerOpen(o); 
         if (!o) {
@@ -335,36 +334,43 @@ const BluetoothConnect = () => {
           }
         }
       }}>
-        <DialogContent>
+        <DialogContent className="glass-card border-primary/30">
           <DialogHeader>
-            <DialogTitle>Выберите устройство</DialogTitle>
+            <DialogTitle className="text-2xl font-black gradient-text">Выберите устройство</DialogTitle>
           </DialogHeader>
-          <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">
-              Для некоторых модулей Android запросит PIN — введите {BT_DEFAULT_PIN}.
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground font-light leading-relaxed">
+              Для некоторых модулей Android запросит PIN — введите <span className="font-mono font-bold text-primary">{BT_DEFAULT_PIN}</span>
             </p>
-            <div className="max-h-60 overflow-auto border rounded-md divide-y">
+            <div className="max-h-60 overflow-auto border-2 border-border/50 rounded-xl divide-y divide-border/30 glass-card">
               {devices.length === 0 ? (
-                <div className="p-4 text-sm text-muted-foreground text-center">
-                  {isScanning ? 'Сканирование...' : 'Устройства не найдены'}
+                <div className="p-6 text-sm text-muted-foreground text-center">
+                  {isScanning ? (
+                    <div className="flex flex-col items-center gap-3">
+                      <Loader2 className="w-8 h-8 text-primary animate-spin" />
+                      <span>Сканирование устройств...</span>
+                    </div>
+                  ) : (
+                    'Устройства не найдены'
+                  )}
                 </div>
               ) : (
                 devices.map((d) => (
-                  <div key={d.deviceId} className="p-3 flex items-center justify-between">
+                  <div key={d.deviceId} className="p-4 flex items-center justify-between hover:bg-primary/5 transition-colors">
                     <div>
-                      <div className="font-medium text-sm">{d.name || 'Неизвестное устройство'}</div>
-                      <div className="text-xs text-muted-foreground font-mono">{d.deviceId}</div>
+                      <div className="font-semibold text-base text-foreground">{d.name || 'Неизвестное устройство'}</div>
+                      <div className="text-xs text-muted-foreground font-mono mt-1">{d.deviceId}</div>
                     </div>
                     <Button 
                       size="sm" 
                       onClick={() => connectToDevice(d.deviceId)} 
                       disabled={isConnecting}
-                      className="min-w-[90px]"
+                      className="min-w-[110px] shadow-lg"
                     >
                       {isConnecting ? (
                         <>
                           <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                          Подключение...
+                          <span className="text-xs">Подключение...</span>
                         </>
                       ) : (
                         'Подключить'
@@ -374,9 +380,13 @@ const BluetoothConnect = () => {
                 ))
               )}
             </div>
-            <div className="flex gap-2 justify-end">
-              <Button variant="outline" onClick={startScan} disabled={isScanning}>Обновить</Button>
-              <Button variant="ghost" onClick={() => setDevicePickerOpen(false)}>Отмена</Button>
+            <div className="flex gap-3 justify-end pt-2">
+              <Button variant="outline" onClick={startScan} disabled={isScanning} className="font-semibold">
+                {isScanning ? 'Сканирование...' : 'Обновить список'}
+              </Button>
+              <Button variant="ghost" onClick={() => setDevicePickerOpen(false)} className="font-semibold">
+                Отмена
+              </Button>
             </div>
           </div>
         </DialogContent>
