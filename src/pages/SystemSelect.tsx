@@ -99,13 +99,14 @@ const SystemSelect = () => {
         <Card className="premium-card p-5">
           <div className="flex flex-col items-center gap-4">
             
-            {/* Compact Icon */}
-            <div className="relative w-28 h-28 rounded-2xl bg-card border border-border/50 p-4 flex items-center justify-center">
+            {/* Wide Tech Image */}
+            <div className="relative w-full h-32 rounded-2xl overflow-hidden border border-border/50">
               <img 
-                src={acPremiumIcon} 
-                alt="AC System" 
-                className="w-full h-full object-contain"
+                src={systemSelectHero} 
+                alt="AC System Diagnostics" 
+                className="w-full h-full object-cover"
               />
+              <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-background/20 to-transparent" />
             </div>
             
             {/* Content */}
