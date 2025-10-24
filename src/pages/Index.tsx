@@ -37,11 +37,11 @@ const Index = () => {
             <span className="text-sm font-medium text-accent">Профессиональная диагностика</span>
           </div>
           
-          <h1 className="text-5xl sm:text-6xl md:text-8xl font-black mb-6 gradient-text leading-tight">
+          <h1 className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-black mb-6 gradient-text leading-tight">
             Панцирь
           </h1>
           
-          <p className="text-xl sm:text-2xl md:text-3xl text-muted-foreground mb-4 px-4 font-light">
+          <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl text-muted-foreground mb-4 px-4 font-light leading-relaxed max-w-3xl mx-auto">
             Система диагностики<br className="sm:hidden" /> кондиционирования
           </p>
           
@@ -68,8 +68,8 @@ const Index = () => {
         </header>
 
         {/* Premium Main Cards */}
-        <div className="flex-1 flex items-center justify-center pb-8">
-          <div className="grid md:grid-cols-2 gap-8 max-w-5xl w-full">
+        <div className="flex-1 flex items-center justify-center pb-8 px-2">
+          <div className="grid md:grid-cols-2 gap-6 sm:gap-8 max-w-6xl w-full">
             
             {/* Premium SKA Card */}
             <Card 
@@ -84,12 +84,12 @@ const Index = () => {
                 <div className="absolute top-0 left-0 w-full h-full bg-primary/10 blur-2xl" />
               </div>
               
-              <div className="relative p-10 h-full flex flex-col items-center justify-center text-center space-y-8">
+              <div className="relative p-8 sm:p-10 h-full flex flex-col items-center justify-center text-center space-y-6 sm:space-y-8 min-h-[500px] sm:min-h-[550px]">
                 {/* Premium Icon Container */}
                 <div className="relative">
                   <div className="absolute inset-0 bg-primary/20 rounded-3xl blur-2xl group-hover:blur-3xl transition-all duration-700" />
-                  <div className="relative w-28 h-28 rounded-3xl bg-gradient-to-br from-primary/30 to-primary/10 backdrop-blur-sm border border-primary/30 flex items-center justify-center group-hover:scale-110 group-hover:rotate-3 transition-all duration-700">
-                    <Settings className="w-14 h-14 text-primary drop-shadow-[0_0_20px_rgba(59,130,246,0.5)]" />
+                  <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-3xl bg-gradient-to-br from-primary/30 to-primary/10 backdrop-blur-sm border border-primary/30 flex items-center justify-center group-hover:scale-110 group-hover:rotate-3 transition-all duration-700">
+                    <Settings className="w-12 h-12 sm:w-14 sm:h-14 text-primary drop-shadow-[0_0_20px_rgba(59,130,246,0.5)]" />
                   </div>
                 </div>
                 
@@ -122,7 +122,7 @@ const Index = () => {
                   </div>
                 </div>
                 
-                <Button className="w-full btn-glow-primary bg-primary hover:bg-primary-glow text-primary-foreground font-semibold py-6 text-lg rounded-xl shadow-lg transition-all duration-300 hover:scale-105">
+                <Button className="w-full btn-glow-primary bg-primary hover:bg-primary-glow text-primary-foreground font-semibold py-6 sm:py-7 text-base sm:text-lg rounded-xl shadow-lg transition-all duration-300 hover:scale-105 min-h-[56px]">
                   Выбрать СКА
                 </Button>
               </div>
@@ -141,12 +141,12 @@ const Index = () => {
                 <div className="absolute top-0 left-0 w-full h-full bg-secondary/10 blur-2xl" />
               </div>
               
-              <div className="relative p-10 h-full flex flex-col items-center justify-center text-center space-y-8">
+              <div className="relative p-8 sm:p-10 h-full flex flex-col items-center justify-center text-center space-y-6 sm:space-y-8 min-h-[500px] sm:min-h-[550px]">
                 {/* Premium Icon Container */}
                 <div className="relative">
                   <div className="absolute inset-0 bg-secondary/20 rounded-3xl blur-2xl group-hover:blur-3xl transition-all duration-700" />
-                  <div className="relative w-28 h-28 rounded-3xl bg-gradient-to-br from-secondary/30 to-secondary/10 backdrop-blur-sm border border-secondary/30 flex items-center justify-center group-hover:scale-110 group-hover:rotate-3 transition-all duration-700">
-                    <Wrench className="w-14 h-14 text-secondary drop-shadow-[0_0_20px_rgba(251,146,60,0.5)]" />
+                  <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-3xl bg-gradient-to-br from-secondary/30 to-secondary/10 backdrop-blur-sm border border-secondary/30 flex items-center justify-center group-hover:scale-110 group-hover:rotate-3 transition-all duration-700">
+                    <Wrench className="w-12 h-12 sm:w-14 sm:h-14 text-secondary drop-shadow-[0_0_20px_rgba(251,146,60,0.5)]" />
                   </div>
                 </div>
                 
@@ -183,7 +183,7 @@ const Index = () => {
                   </div>
                 </div>
                 
-                <Button className="w-full btn-glow-secondary bg-secondary hover:bg-secondary-glow text-secondary-foreground font-semibold py-6 text-lg rounded-xl shadow-lg transition-all duration-300 hover:scale-105">
+                <Button className="w-full btn-glow-secondary bg-secondary hover:bg-secondary-glow text-secondary-foreground font-semibold py-6 sm:py-7 text-base sm:text-lg rounded-xl shadow-lg transition-all duration-300 hover:scale-105 min-h-[56px]">
                   Выбрать СКЭ
                 </Button>
               </div>

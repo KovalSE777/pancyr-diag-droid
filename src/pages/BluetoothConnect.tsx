@@ -224,18 +224,11 @@ const BluetoothConnect = () => {
             Назад
           </Button>
           <h1 className="text-3xl font-black gradient-text">Подключение</h1>
-          <Button
-            variant="ghost"
-            onClick={() => navigate('/ble-debug')}
-            className="text-muted-foreground hover:text-primary"
-            title="Расширенная отладка BLE"
-          >
-            <Wrench className="h-5 w-5" />
-          </Button>
+          <div className="w-24" />
         </div>
       </header>
 
-      <main className="relative container mx-auto px-4 py-12 max-w-2xl">
+      <main className="relative container mx-auto px-4 py-12 max-w-2xl safe-bottom pb-24">
         {/* Connection Status Card */}
         <Card className="premium-card p-12 mb-8 animate-fade-in">
           <div className="flex flex-col items-center text-center space-y-6">
@@ -265,7 +258,7 @@ const BluetoothConnect = () => {
             {!isConnected && !isConnecting && (
               <Button 
                 onClick={handleConnect}
-                className="w-full max-w-xs btn-glow-primary bg-primary hover:bg-primary-glow font-semibold text-lg py-7 rounded-xl shadow-lg transition-all duration-300 hover:scale-105"
+                className="w-full max-w-xs btn-glow-primary bg-primary hover:bg-primary-glow font-semibold text-base sm:text-lg py-7 rounded-xl shadow-lg transition-all duration-300 hover:scale-105 min-h-[56px]"
               >
                 <Bluetooth className="mr-2 h-5 w-5" />
                 Подключиться к БСКУ

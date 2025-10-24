@@ -90,7 +90,7 @@ const SystemSelect = () => {
         </div>
       </header>
 
-      <main className="relative container mx-auto px-4 py-12 pb-20 space-y-10">
+      <main className="relative container mx-auto px-4 py-12 pb-24 space-y-10 safe-bottom">
         
         {/* Premium System Info Card */}
         <Card className="premium-card p-10 animate-fade-in">
@@ -155,7 +155,7 @@ const SystemSelect = () => {
               <div className="absolute top-0 left-0 w-full h-full bg-primary/10 blur-2xl" />
             </div>
             
-            <div className="relative p-10 flex flex-col items-center text-center space-y-6">
+            <div className="relative p-8 sm:p-10 flex flex-col items-center text-center space-y-5 sm:space-y-6 min-h-[400px] sm:min-h-[450px]">
               <div className="relative">
                 <div className="absolute inset-0 bg-primary/20 rounded-2xl blur-2xl group-hover:blur-3xl transition-all duration-700" />
                 <div className="relative w-24 h-24 rounded-2xl bg-gradient-to-br from-primary/30 to-primary/10 backdrop-blur-sm border border-primary/30 flex items-center justify-center group-hover:scale-110 group-hover:rotate-3 transition-all duration-700">
@@ -172,7 +172,7 @@ const SystemSelect = () => {
                 </p>
               </div>
               
-              <Button className="w-full btn-glow-primary bg-primary hover:bg-primary-glow text-primary-foreground font-semibold py-6 text-lg rounded-xl shadow-lg transition-all duration-300 hover:scale-105">
+              <Button className="w-full btn-glow-primary bg-primary hover:bg-primary-glow text-primary-foreground font-semibold py-6 sm:py-7 text-base sm:text-lg rounded-xl shadow-lg transition-all duration-300 hover:scale-105 min-h-[56px]">
                 Начать диагностику
               </Button>
             </div>
@@ -189,7 +189,7 @@ const SystemSelect = () => {
               <div className="absolute top-0 left-0 w-full h-full bg-accent/10 blur-2xl" />
             </div>
             
-            <div className="relative p-10 flex flex-col items-center text-center space-y-6">
+            <div className="relative p-8 sm:p-10 flex flex-col items-center text-center space-y-5 sm:space-y-6 min-h-[400px] sm:min-h-[450px]">
               <div className="relative">
                 <div className="absolute inset-0 bg-accent/20 rounded-2xl blur-2xl group-hover:blur-3xl transition-all duration-700" />
                 <div className="relative w-24 h-24 rounded-2xl bg-gradient-to-br from-accent/30 to-accent/10 backdrop-blur-sm border border-accent/30 flex items-center justify-center group-hover:scale-110 group-hover:rotate-3 transition-all duration-700">
@@ -206,7 +206,7 @@ const SystemSelect = () => {
                 </p>
               </div>
               
-              <Button className="w-full bg-gradient-to-r from-accent to-accent-glow hover:from-accent-glow hover:to-accent text-accent-foreground font-semibold py-6 text-lg rounded-xl shadow-lg shadow-accent/20 transition-all duration-300 hover:scale-105 hover:shadow-accent/40">
+              <Button className="w-full bg-gradient-to-r from-accent to-accent-glow hover:from-accent-glow hover:to-accent text-accent-foreground font-semibold py-6 sm:py-7 text-base sm:text-lg rounded-xl shadow-lg shadow-accent/20 transition-all duration-300 hover:scale-105 hover:shadow-accent/40 min-h-[56px]">
                 Открыть справку
               </Button>
             </div>

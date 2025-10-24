@@ -329,7 +329,7 @@ const RepairGuide = () => {
         </div>
       </header>
 
-      <main className="relative container mx-auto px-4 py-6 space-y-8">
+      <main className="relative container mx-auto px-4 py-6 space-y-8 safe-bottom pb-24">
         {filteredRepairs.length === 0 ? (
           <Card className="premium-card p-16 text-center">
             <AlertTriangle className="w-16 h-16 text-muted-foreground mx-auto mb-4 opacity-50" />
