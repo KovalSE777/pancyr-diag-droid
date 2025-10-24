@@ -52,17 +52,20 @@ const adc8ToPressureBar = (adc: number): number => interp8(adc & 0xFF, PRESS_TAB
  */
 export class Screen4Parser {
   /**
-   * Парсит телеметрию Screen 4 (НОВЫЙ ФОРМАТ от оригинального приложения)
+   * Парсит телеметрию Screen 4 (ФОРМАТ 0x88 - 38 байт)
    * 
-   * Формат данных из логов оригинального приложения:
-   * [0-X]: Данные телеметрии (формат может быть u16 LE или u8)
-   * 
-   * Пример из логов: 0 0 20 1 21 1 21 1 21 1 32 21 11 29 18 8 ...
-   * 
-   * ВАЖНО: Точный формат требует уточнения из декомпилированного APK!
-   * Пока используем частичную интерпретацию на основе известных данных.
-   * 
-   * TODO: Определить точную структуру через декомпиляцию или анализ логов
+   * Формат данных согласно документу УСПЕХ_ДАННЫЕ_ПРИХОДЯТ.md:
+   * [0]    = 0x88         - HDR (заголовок UDS-like)
+   * [1]    = 0x04         - Screen ID
+   * [2]    = 0x21         - Длина данных / тип
+   * [3-7]  = 0xFF × 5     - Синхронизация
+   * [8]    = битовая маска/флаги
+   * [9]    = битовая маска/флаги
+   * [10-11] = параметры
+   * [12-19] = напряжения (u16 Big Endian)
+   * [20-25] = дополнительные данные
+   * [26-36] = параметры
+   * [37]    = счетчик пакетов
    */
   static parse(payload: Uint8Array, systemType: 'SKA' | 'SKE' = 'SKA'): DiagnosticData | null {
     // Валидация systemType
@@ -71,116 +74,120 @@ export class Screen4Parser {
       return null;
     }
     
-    // Минимальная длина на основе анализа логов
-    // TODO: Уточнить точную минимальную длину
-    if (payload.length < 20) {
-      logService.error('Screen4Parser', `Payload too short: ${payload.length} bytes, expected minimum 20`);
+    // Проверка минимальной длины (38 байт для формата 0x88)
+    if (payload.length < 38) {
+      logService.error('Screen4Parser', `Payload too short: ${payload.length} bytes, expected 38`);
       return null;
     }
     
-    logService.info('Screen4Parser', `Parsing NEW protocol format: ${payload.length} bytes`);
-    logService.info('Screen4Parser', `Data: ${Array.from(payload.slice(0, Math.min(30, payload.length))).join(' ')}`);
+    // Проверка заголовка 0x88
+    if (payload[0] !== 0x88) {
+      logService.error('Screen4Parser', `Invalid header: 0x${payload[0].toString(16)}, expected 0x88`);
+      return null;
+    }
     
-    // ========== ВРЕМЕННАЯ ИНТЕРПРЕТАЦИЯ (требует уточнения!) ==========
+    logService.info('Screen4Parser', `Parsing 0x88 format: ${payload.length} bytes`);
     
-    // Helper: Read u16 Little Endian
-    const readU16LE = (offset: number): number => {
-      if (offset + 1 >= payload.length) return 0;
-      return payload[offset] | (payload[offset + 1] << 8);
+    // ========== ИЗВЛЕЧЕНИЕ ДАННЫХ ==========
+    
+    // Заголовок
+    const screenId = payload[1];  // 0x04
+    const dataType = payload[2];  // 0x21
+    
+    // Битовые маски
+    const flags1 = payload[8];  // 0x0F
+    const flags2 = payload[9];  // 0xC0
+    
+    // Helper: Read u16 Big Endian
+    const readU16BE = (offset: number): number => {
+      return (payload[offset] << 8) | payload[offset + 1];
     };
     
-    // Попытка декодирования на основе частичных данных из логов
-    // Формат: возможно u16 LE для некоторых значений
+    // Напряжения (u16 Big Endian) - байты 12-19
+    const U_UM1_raw = readU16BE(12);  // 0xE400 = 58368
+    const U_UM2_raw = readU16BE(14);  // 0xE400 = 58368
+    const U_UM3_raw = readU16BE(16);  // 0xE500 = 58624
+    const U_FU_raw  = readU16BE(18);  // 0xE500 = 58624
     
-    // Байты 0-1: неизвестно (0 0)
-    // Байт 2: 20 (возможно параметр)
-    const param1 = payload.length > 2 ? payload[2] : 0;
+    // Коэффициент преобразования (ВРЕМЕННАЯ ФОРМУЛА - требует проверки!)
+    // Вариант: value / 65535 * 30
+    // TODO: Проверить с реальными значениями из оригинального приложения!
+    const toVoltage = (raw: number): number => {
+      return (raw / 65535) * 30;
+    };
     
-    // Байты 3-4, 5-6, 7-8, 9-10: возможно u16 значения (1,21 → 277)
-    const value1 = payload.length > 4 ? readU16LE(3) : 0;
-    const value2 = payload.length > 6 ? readU16LE(5) : 0;
-    const value3 = payload.length > 8 ? readU16LE(7) : 0;
-    const value4 = payload.length > 10 ? readU16LE(9) : 0;
+    const UP_M1 = toVoltage(U_UM1_raw);
+    const UP_M2 = toVoltage(U_UM2_raw);
+    const UP_M3 = toVoltage(U_UM3_raw);
+    const U_nap = toVoltage(U_FU_raw);
     
-    // Байты 11-15: отдельные параметры
-    const param2 = payload.length > 11 ? payload[11] : 0;  // 21
-    const param3 = payload.length > 12 ? payload[12] : 0;  // 11
-    const param4 = payload.length > 13 ? payload[13] : 0;  // 29
-    const param5 = payload.length > 14 ? payload[14] : 0;  // 18
-    const param6 = payload.length > 15 ? payload[15] : 0;  // 8
+    // Параметры
+    const param1 = payload[27];  // Счетчик/температура? (растет со временем)
+    const pwm_mode = payload[31];  // PWM или режим (0x02)
+    const param2 = payload[32];  // 0xA8 (168)
+    const param3 = payload[33];  // 0x56 (86)
+    const param4 = payload[34];  // 0x0A (10)
+    const flag1 = payload[35];   // 0x01
     
-    // TODO: КРИТИЧЕСКИ ВАЖНО - определить правильный маппинг!
-    // Пока используем предположения:
-    // - value1-4 могут быть напряжениями (если разделить на 10 получаем ~27V)
-    // - param2-6 могут быть температурами или другими параметрами
+    // Счетчик пакетов
+    const packet_counter = payload[37];
     
-    // Предположительные напряжения (value1-4 ≈ 277 → 27.7V при делении на 10)
-    const UP_M1 = value1 / 10.0;
-    const UP_M2 = value2 / 10.0;
-    const UP_M3 = value3 / 10.0;
-    const U_nap = value4 / 10.0;
+    logService.info('Screen4Parser', 
+      `Decoded 0x88: UM1=${UP_M1.toFixed(2)}V, UM2=${UP_M2.toFixed(2)}V, ` +
+      `UM3=${UP_M3.toFixed(2)}V, U_nap=${U_nap.toFixed(2)}V, packet#${packet_counter}`
+    );
     
-    // Предположительные температуры (используем калибровочные таблицы)
-    // TODO: Определить точные индексы ADC температур в новом формате!
-    const T_air_adc = payload.length > 16 ? payload[16] : 0x6A;
-    const T_isp_adc = payload.length > 17 ? payload[17] : 0x30;
-    const T_kmp_adc = payload.length > 18 ? payload[18] : 0x40;
-    const U_davl_adc = payload.length > 19 ? payload[19] : 107;
+    // ========== ИЗВЛЕЧЕНИЕ БИТОВЫХ ПОЛЕЙ ==========
+    // TODO: Определить точное значение каждого бита из декомпиляции оригинального APK
+    
+    // Временные значения - предположительные
+    const fuseEtalon = (flags1 & 0x01) !== 0;
+    const fuseCondenser = (flags1 & 0x02) !== 0;
+    const fuseEvaporator = (flags1 & 0x04) !== 0;
+    const fuseCompressor = (flags1 & 0x08) !== 0;
+    
+    const bNO_V_CMP = (flags2 & 0x40) !== 0;  // Компрессор не вращается?
+    const bD_DAVL = (flags2 & 0x80) !== 0;    // Датчик давления OK?
+    const bK_NORM = true;  // TODO: Извлечь из flags
+    const bFTD_NORM = true;  // TODO: Извлечь из flags
+    
+    // Режимы работы (на основе pwm_mode)
+    let work_rej_cmp_val = pwm_mode === 0x02 ? 2 : 0;  // 2 = охлаждение
+    let rej_cnd_val = pwm_mode === 0x02 ? 2 : 0;
+    let rej_isp_val = pwm_mode === 0x02 ? 2 : 0;
+    
+    // Температуры (используем ADC таблицы - значения по умолчанию)
+    // TODO: Определить откуда извлекать ADC температур в формате 0x88!
+    const T_air_adc = 0x6A;  // Дефолт
+    const T_isp_adc = 0x30;  // Дефолт
+    const T_kmp_adc = 0x40;  // Дефолт
+    const U_davl_adc = 107;  // Дефолт
     
     const T_air = adc8ToTempA(T_air_adc);
     const T_isp = adc8ToTempA(T_isp_adc);
     const T_kmp = adc8ToTempB(T_kmp_adc);
     const U_davl = adc8ToPressureBar(U_davl_adc);
     
-    logService.info('Screen4Parser', 
-      `Decoded (TENTATIVE): U1=${UP_M1.toFixed(1)}V, U2=${UP_M2.toFixed(1)}V, ` +
-      `U3=${UP_M3.toFixed(1)}V, U_nap=${U_nap.toFixed(1)}V, ` +
-      `T_air=${T_air.toFixed(1)}°C, T_isp=${T_isp.toFixed(1)}°C`
-    );
+    // ========== ФОРМИРОВАНИЕ РЕЗУЛЬТАТА ==========
     
-    // ========== ФОРМИРОВАНИЕ РЕЗУЛЬТАТА С ДЕФОЛТНЫМИ ЗНАЧЕНИЯМИ ==========
-    
-    // Так как точный формат неизвестен, используем безопасные дефолты
-
-    
-    // Используем безопасные дефолты для неизвестных полей
     const kUM1_cnd = systemType === 'SKE' ? 3 : 2;
     const kUM2_isp = 1;
     const kUM3_cmp = 1;
     
-    // Дефолтные битовые поля (пока не знаем их положение в новом формате)
-    // TODO: Определить точное положение битовых полей!
-    const fuseEtalon = true;
-    const fuseCondenser = true;
-    const fuseEvaporator = true;
-    const fuseCompressor = true;
-    const bNO_V_CMP = false;
-    const bD_DAVL = true;
-    const bK_NORM = true;
-    const bFTD_NORM = true;
-    
-    // Режимы работы (дефолт - не знаем точно) - используем переменные
-    let work_rej_cmp_val = 2;  // Предположительно охлаждение
-    let rej_cnd_val = 2;
-    let rej_isp_val = 2;
-    
-    // Падения напряжения (если не определены)
     const dUP_M1 = 0;
     const dUP_M2 = 0;
     const dUP_M3 = 0;
     
-    // PWM и другие параметры
     const PWM_spd_val = 2;
-    const n_V_cnd = kUM1_cnd;  // Все вентиляторы работают (оптимистичный сценарий)
+    const n_V_cnd = kUM1_cnd;
     const s1_TMR2 = 120;
     const s0_TMR2 = 80;
     const timer_off = 0;
     const edlt_cnd = 25;
     const edlt_isp = 20;
     const edlt_cmp = 30;
-    const sDAT_BIT = 0;
+    const sDAT_BIT = flags1;  // Используем flags1 для sDAT_BIT
     
-    // ========== ФОРМИРОВАНИЕ РЕЗУЛЬТАТА ==========
     // Создание массивов статусов вентиляторов
     const condenserFans = [];
     for (let i = 1; i <= kUM1_cnd; i++) {
@@ -271,8 +278,8 @@ export class Screen4Parser {
       });
     }
 
-    logService.success('Screen4Parser', `Parsed NEW protocol format: U=${U_nap.toFixed(1)}V, T_air=${T_air.toFixed(1)}°C, mode=${mode}`);
-    logService.warn('Screen4Parser', '⚠️  IMPORTANT: Telemetry format is TENTATIVE and needs verification from decompiled APK!');
+    logService.success('Screen4Parser', `Parsed 0x88 format: U=${U_nap.toFixed(1)}V, T_air=${T_air.toFixed(1)}°C, mode=${mode}, pkt#${packet_counter}`);
+    logService.warn('Screen4Parser', '⚠️  ФОРМУЛЫ НАПРЯЖЕНИЙ ТРЕБУЮТ ПРОВЕРКИ! Сравните с оригинальным приложением.');
 
     return {
       // Напряжения

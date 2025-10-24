@@ -117,34 +117,20 @@ export class CapacitorBluetoothService {
   // Удалены дублированные методы hexToBytes/bytesToHex - используем из utils/hex.ts
 
   /**
-   * Инициализация соединения (новый протокол)
-   * Последовательность:
-   * 1. Пауза 200ms для стабилизации
-   * 2. Отправить UCONF (запрос конфигурации)
-   * 3. Подождать ответа от БСКУ (0x66 или телеметрия)
-   * 4. Через 500ms запустить циклический опрос
+   * Начать обмен данными по новому протоколу
+   * БСКУ САМ ИНИЦИИРУЕТ ПЕРЕДАЧУ ДАННЫХ!
+   * Не нужно отправлять циклический опрос - БСКУ шлет данные каждые ~200ms
    */
   private async startCommunication(): Promise<void> {
-    logService.info('BT Serial', '🚀 Starting communication');
+    logService.info('BT Serial', '🚀 Starting communication - waiting for data from BSKU...');
+    logService.info('BT Serial', '📡 BSKU will send data automatically (no polling needed)');
     
-    // 1. UCONF
-    const uconfPacket = buildUCONF();
-    await this.sendRaw(uconfPacket);
-    logService.info('BT Serial', '📤 Sent UCONF');
+    // БСКУ сам начинает отправлять данные после подключения!
+    // Приложение только слушает и обрабатывает входящие пакеты:
+    // - 0x88 = телеметрия (каждые ~200ms)
+    // - 0x66 = команда смены экрана (на которую отвечаем UOKS)
     
-    await new Promise(resolve => setTimeout(resolve, 200));
-    
-    // 2. UOKS
-    const uoksPacket = buildUOKS(4);
-    await this.sendRaw(uoksPacket);
-    logService.info('BT Serial', '📤 Sent UOKS(4)');
-    
-    await new Promise(resolve => setTimeout(resolve, 300));
-    
-    // 3. Cyclic polling
-    this.startCyclicPolling();
-    
-    logService.info('BT Serial', '✅ Communication started');
+    logService.info('BT Serial', '✅ Ready to receive data from BSKU');
   }
 
   /**
@@ -198,54 +184,86 @@ export class CapacitorBluetoothService {
   }
 
   /**
-   * Попытка распарсить пакеты нового протокола из буфера
+   * Попытка распарсить пакеты из буфера
+   * Формат БСКУ:
+   * - 0x88 = телеметрия (38 байт)
+   * - 0x66 = команда смены экрана (7 байт: 66 53 43 52 5F <screenId> <checksum>)
    */
-  private tryParseNewProtocolPackets(): void {
-    // Ищем заголовок 0xFF в буфере
-    let foundHeader = false;
-    let headerStart = -1;
-    
-    for (let i = 0; i < this.receiveBuffer.length - 7; i++) {
-      // Проверяем на наличие как минимум 4-х байт 0xFF подряд
-      if (this.receiveBuffer[i] === 0xFF &&
-          this.receiveBuffer[i + 1] === 0xFF &&
-          this.receiveBuffer[i + 2] === 0xFF &&
-          this.receiveBuffer[i + 3] === 0xFF) {
-        foundHeader = true;
-        headerStart = i;
-        break;
+  private async tryParseNewProtocolPackets(): Promise<void> {
+    // Ищем заголовки пакетов в буфере
+    while (this.receiveBuffer.length > 0) {
+      const firstByte = this.receiveBuffer[0];
+      
+      // Проверяем тип пакета по первому байту
+      if (firstByte === 0x88) {
+        // Телеметрия (38 байт)
+        if (this.receiveBuffer.length >= 38) {
+          const telemetryPacket = this.receiveBuffer.slice(0, 38);
+          logService.info('BT-RX', `📊 Telemetry packet (0x88) - 38 bytes`);
+          
+          // Парсить через Screen4Parser
+          const diagnosticData = Screen4Parser.parse(telemetryPacket, this.systemType);
+          
+          if (diagnosticData) {
+            this.latestData = diagnosticData;
+            logService.success('BT-RX', '✅ Telemetry parsed successfully');
+            
+            // Добавить в историю HEX фреймов
+            const hex = bytesToHex(telemetryPacket);
+            this.addHexFrame('RX', hex, true, 'TELEMETRY');
+          } else {
+            logService.error('BT-RX', 'Failed to parse telemetry');
+          }
+          
+          // Удалить обработанный пакет из буфера
+          this.receiveBuffer = this.receiveBuffer.slice(38);
+        } else {
+          // Недостаточно данных, ждем еще
+          break;
+        }
+      } else if (firstByte === 0x66) {
+        // Команда смены экрана (7 байт: 66 53 43 52 5F <screenId> <checksum>)
+        if (this.receiveBuffer.length >= 7) {
+          const screenChangePacket = this.receiveBuffer.slice(0, 7);
+          
+          // Проверить сигнатуру "SCR_"
+          if (screenChangePacket[1] === 0x53 && 
+              screenChangePacket[2] === 0x43 && 
+              screenChangePacket[3] === 0x52 && 
+              screenChangePacket[4] === 0x5F) {
+            
+            const screenId = screenChangePacket[5];
+            logService.info('BT-RX', `🖥️  Screen change command: Screen ${screenId}`);
+            
+            // Отправить UOKS в ответ
+            const uoksPacket = buildUOKS(screenId);
+            await this.sendRaw(uoksPacket);
+            logService.success('BT-TX', `✅ Sent UOKS for screen ${screenId}`);
+            
+            // Добавить в историю
+            const hex = bytesToHex(screenChangePacket);
+            this.addHexFrame('RX', hex, true, 'SCREEN_CHANGE');
+          } else {
+            logService.warn('BT-RX', 'Invalid screen change packet signature');
+          }
+          
+          // Удалить обработанный пакет
+          this.receiveBuffer = this.receiveBuffer.slice(7);
+        } else {
+          // Недостаточно данных
+          break;
+        }
+      } else {
+        // Неизвестный заголовок - пропускаем 1 байт
+        logService.warn('BT-RX', `Unknown packet header: 0x${firstByte.toString(16)}`);
+        this.receiveBuffer = this.receiveBuffer.slice(1);
       }
-    }
-    
-    if (!foundHeader) {
-      // Заголовок не найден, очищаем буфер если он слишком большой
-      if (this.receiveBuffer.length > 200) {
+      
+      // Защита от бесконечного цикла
+      if (this.receiveBuffer.length > 500) {
         logService.warn('BT-RX', 'Buffer overflow, clearing...');
         this.receiveBuffer = new Uint8Array(0);
-      }
-      return;
-    }
-    
-    // Нашли заголовок, пытаемся распарсить пакет
-    const packet = parseBskuPacket(this.receiveBuffer.slice(headerStart));
-    
-    if (packet) {
-      logService.success('BT-RX', `Parsed BSKU packet: type=${packet.type}`);
-      this.handleBskuPacket(packet);
-      
-      // Удаляем распарсенную часть из буфера
-      // Грубая оценка: заголовок (7) + тип (1) + данные (~30) = ~40 байт
-      const estimatedPacketSize = 40;
-      this.receiveBuffer = this.receiveBuffer.slice(headerStart + estimatedPacketSize);
-    } else {
-      // Не удалось распарсить, может данные ещё не полностью получены
-      // Ждём больше данных, но сохраняем только с заголовка
-      this.receiveBuffer = this.receiveBuffer.slice(headerStart);
-      
-      // Если буфер слишком большой, что-то не так
-      if (this.receiveBuffer.length > 100) {
-        logService.warn('BT-RX', 'Failed to parse packet, clearing buffer');
-        this.receiveBuffer = new Uint8Array(0);
+        break;
       }
     }
   }
