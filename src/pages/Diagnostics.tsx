@@ -247,33 +247,6 @@ const Diagnostics = () => {
           onRelayControl={handleRelayControl}
         />
 
-        {/* System Overview - Premium Card */}
-        <Card className="premium-card p-5 sm:p-6 animate-fade-in">
-          <h2 className="text-lg sm:text-xl font-black mb-5 flex items-center gap-2 text-foreground">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
-              <Thermometer className="w-5 h-5 text-primary" />
-            </div>
-            <span>Общие параметры</span>
-          </h2>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-            <div className="glass-card p-4 rounded-xl text-center hover:bg-primary/5 transition-colors min-h-[100px] flex flex-col justify-center">
-              <p className="text-xs text-muted-foreground mb-2 font-medium">Температура воздуха</p>
-              <p className="text-2xl sm:text-3xl font-mono font-black text-primary">{data.T_air.toFixed(1)}°</p>
-            </div>
-            <div className="glass-card p-4 rounded-xl text-center hover:bg-primary/5 transition-colors min-h-[100px] flex flex-col justify-center">
-              <p className="text-xs text-muted-foreground mb-2 font-medium">T. испарителя</p>
-              <p className="text-2xl sm:text-3xl font-mono font-black text-primary">{data.T_isp.toFixed(1)}°</p>
-            </div>
-            <div className="glass-card p-4 rounded-xl text-center hover:bg-accent/5 transition-colors min-h-[100px] flex flex-col justify-center">
-              <p className="text-xs text-muted-foreground mb-2 font-medium">Напряжение</p>
-              <p className="text-2xl sm:text-3xl font-mono font-black text-accent">{data.U_nap.toFixed(1)}V</p>
-            </div>
-            <div className="glass-card p-4 rounded-xl text-center hover:bg-accent/5 transition-colors min-h-[100px] flex flex-col justify-center">
-              <p className="text-xs text-muted-foreground mb-2 font-medium">Давление</p>
-              <p className="text-2xl sm:text-3xl font-mono font-black text-accent">{data.U_davl.toFixed(1)}</p>
-            </div>
-          </div>
-        </Card>
 
         {/* Fans Visual Status - Mobile Optimized */}
         <Card className="premium-card p-5 sm:p-6 animate-fade-in [animation-delay:50ms]">

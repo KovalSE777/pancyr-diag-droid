@@ -27,7 +27,7 @@ export const FanIndicator = ({ fans, label }: FanIndicatorProps) => {
   return (
     <div className="space-y-3">
       <h3 className="text-base sm:text-lg md:text-xl font-bold text-foreground text-center">{label}</h3>
-      <div className="w-full grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2 sm:gap-3">
+      <div className="w-full grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2 sm:gap-3 justify-items-center">
         {fans.map((fan) => (
           <div key={fan.id} className="flex flex-col items-center space-y-1.5">
             <div 
