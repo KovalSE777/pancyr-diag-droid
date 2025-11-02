@@ -59,11 +59,11 @@ const SystemSelect = () => {
       {/* Multi-layer Optimized Background */}
       <div className="absolute inset-0">
         <div 
-          className="absolute inset-0 opacity-40 bg-cover bg-center"
+          className="absolute inset-0 opacity-40 bg-cover bg-center will-change-auto"
           style={{ backgroundImage: `url(${systemSelectHero})` }}
         />
         <div 
-          className="absolute inset-0 opacity-15 bg-cover bg-center"
+          className="absolute inset-0 opacity-15 bg-cover bg-center will-change-auto"
           style={{ backgroundImage: `url(${patternBg})` }}
         />
         <div className="absolute inset-0 bg-gradient-to-b from-background/70 via-background/85 to-background" />
@@ -147,11 +147,11 @@ const SystemSelect = () => {
           
           {/* Connect Card */}
           <Card 
-            className="group premium-card cursor-pointer"
+            className="group premium-card cursor-pointer active:scale-[0.98] touch-manipulation"
             onClick={() => navigate(`/bluetooth-connect?type=${systemType}`)}
           >
             <div className="relative p-5 flex flex-col items-center text-center space-y-3">
-              <div className="w-16 h-16 rounded-xl bg-primary/10 border border-primary/30 flex items-center justify-center group-hover:scale-105 transition-transform">
+              <div className="w-16 h-16 rounded-xl bg-primary/10 border border-primary/30 flex items-center justify-center group-hover:scale-105 transition-transform will-change-transform">
                 <Bluetooth className="w-8 h-8 text-primary" />
               </div>
               
@@ -172,11 +172,11 @@ const SystemSelect = () => {
 
           {/* Repair Guide Card */}
           <Card 
-            className="group premium-card cursor-pointer"
+            className="group premium-card cursor-pointer active:scale-[0.98] touch-manipulation"
             onClick={() => navigate(`/repair-guide?type=${systemType}`)}
           >
             <div className="relative p-5 flex flex-col items-center text-center space-y-3">
-              <div className="w-16 h-16 rounded-xl bg-accent/10 border border-accent/30 flex items-center justify-center group-hover:scale-105 transition-transform">
+              <div className="w-16 h-16 rounded-xl bg-accent/10 border border-accent/30 flex items-center justify-center group-hover:scale-105 transition-transform will-change-transform">
                 <BookOpen className="w-8 h-8 text-accent" />
               </div>
               

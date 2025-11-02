@@ -2,22 +2,40 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Settings, Wrench, Sparkles, Zap } from "lucide-react";
+import { useState, useEffect } from "react";
 import heroGradientBg from "@/assets/hero-gradient-bg.jpg";
 import patternBg from "@/assets/pattern-bg.jpg";
 
 const Index = () => {
   const navigate = useNavigate();
+  const [imagesLoaded, setImagesLoaded] = useState(false);
+
+  useEffect(() => {
+    const img1 = new Image();
+    const img2 = new Image();
+    let loaded = 0;
+    
+    const onLoad = () => {
+      loaded++;
+      if (loaded === 2) setImagesLoaded(true);
+    };
+    
+    img1.onload = onLoad;
+    img2.onload = onLoad;
+    img1.src = heroGradientBg;
+    img2.src = patternBg;
+  }, []);
 
   return (
     <main className="min-h-screen relative overflow-hidden">
       {/* Multi-layer Optimized Background */}
       <div className="absolute inset-0">
         <div 
-          className="absolute inset-0 bg-cover bg-center opacity-60"
+          className={`absolute inset-0 bg-cover bg-center opacity-60 transition-opacity duration-500 will-change-auto ${imagesLoaded ? 'opacity-60' : 'opacity-0'}`}
           style={{ backgroundImage: `url(${heroGradientBg})` }}
         />
         <div 
-          className="absolute inset-0 opacity-20 bg-cover bg-center"
+          className={`absolute inset-0 opacity-20 bg-cover bg-center transition-opacity duration-500 will-change-auto ${imagesLoaded ? 'opacity-20' : 'opacity-0'}`}
           style={{ backgroundImage: `url(${patternBg})` }}
         />
         <div className="absolute inset-0 bg-gradient-to-b from-background/70 via-background/85 to-background" />
@@ -67,12 +85,12 @@ const Index = () => {
             
             {/* Compact SKA Card */}
             <Card 
-              className="group relative overflow-hidden premium-card cursor-pointer"
+              className="group relative overflow-hidden premium-card cursor-pointer active:scale-[0.98] touch-manipulation"
               onClick={() => navigate('/system-select?type=ska')}
             >
               <div className="relative p-5 h-full flex flex-col items-center justify-center text-center space-y-4">
                 {/* Icon */}
-                <div className="relative w-20 h-20 rounded-2xl bg-primary/10 border border-primary/30 flex items-center justify-center group-hover:scale-105 transition-transform">
+                <div className="relative w-20 h-20 rounded-2xl bg-primary/10 border border-primary/30 flex items-center justify-center group-hover:scale-105 transition-transform will-change-transform">
                   <Settings className="w-10 h-10 text-primary" />
                 </div>
                 
@@ -113,12 +131,12 @@ const Index = () => {
 
             {/* Compact SKE Card */}
             <Card 
-              className="group relative overflow-hidden premium-card cursor-pointer"
+              className="group relative overflow-hidden premium-card cursor-pointer active:scale-[0.98] touch-manipulation"
               onClick={() => navigate('/system-select?type=ske')}
             >
               <div className="relative p-5 h-full flex flex-col items-center justify-center text-center space-y-4">
                 {/* Icon */}
-                <div className="relative w-20 h-20 rounded-2xl bg-secondary/10 border border-secondary/30 flex items-center justify-center group-hover:scale-105 transition-transform">
+                <div className="relative w-20 h-20 rounded-2xl bg-secondary/10 border border-secondary/30 flex items-center justify-center group-hover:scale-105 transition-transform will-change-transform">
                   <Wrench className="w-10 h-10 text-secondary" />
                 </div>
                 

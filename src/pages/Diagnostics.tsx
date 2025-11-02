@@ -163,7 +163,7 @@ const Diagnostics = () => {
     <div className="min-h-screen bg-background relative overflow-hidden pb-24 safe-top safe-bottom">
       {/* Multi-layer Optimized Background */}
       <div className="fixed inset-0 pointer-events-none">
-        <div className="absolute inset-0 opacity-30 bg-cover bg-center" style={{ backgroundImage: `url(${patternBg})` }} />
+        <div className="absolute inset-0 opacity-30 bg-cover bg-center will-change-auto" style={{ backgroundImage: `url(${patternBg})` }} />
         <div className="absolute inset-0 bg-gradient-to-b from-background/75 via-background/90 to-background" />
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5" />
       </div>

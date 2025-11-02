@@ -207,7 +207,7 @@ const BluetoothConnect = () => {
     <div className="min-h-screen bg-background relative overflow-hidden safe-top safe-bottom">
       {/* Multi-layer Optimized Background */}
       <div className="absolute inset-0">
-        <div className="absolute inset-0 opacity-30 bg-cover bg-center" style={{ backgroundImage: `url(${patternBg})` }} />
+        <div className="absolute inset-0 opacity-30 bg-cover bg-center will-change-auto" style={{ backgroundImage: `url(${patternBg})` }} />
         <div className="absolute inset-0 bg-gradient-to-b from-background/75 via-background/90 to-background" />
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5" />
       </div>
@@ -261,7 +261,7 @@ const BluetoothConnect = () => {
             {!isConnected && !isConnecting && (
               <Button 
                 onClick={handleConnect}
-                className="w-full bg-primary hover:bg-primary/90 font-semibold text-sm py-5 rounded-lg transition-colors min-h-[48px]"
+                className="w-full bg-primary hover:bg-primary/90 font-semibold text-sm py-5 rounded-lg transition-colors min-h-[48px] active:scale-[0.98] touch-manipulation"
               >
                 <Bluetooth className="mr-2 h-4 w-4" />
                 Подключиться
@@ -310,7 +310,7 @@ const BluetoothConnect = () => {
             <Button 
               variant="outline" 
               onClick={handleUseMockData}
-              className="border-accent/50 text-accent hover:bg-accent/20 text-sm py-4 w-full"
+              className="border-accent/50 text-accent hover:bg-accent/20 text-sm py-4 w-full active:scale-[0.98] touch-manipulation"
             >
               Демо-данные
             </Button>
