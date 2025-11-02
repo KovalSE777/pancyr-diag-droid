@@ -298,35 +298,33 @@ const Diagnostics = () => {
             </div>
           </div>
           
-          <div className="overflow-x-auto -mx-2 px-2">
-            <div className="flex gap-6 min-w-max pb-2">
-              <div className="flex-shrink-0">
-                <FanIndicator 
-                  fans={data.condenserFans} 
-                  label="Конденсатор" 
-                />
-                <p className="text-center text-sm text-muted-foreground mt-3 font-medium">
-                  {data.n_V_cnd} из {data.kUM1_cnd}
-                </p>
-              </div>
-              <div className="flex-shrink-0">
-                <FanIndicator 
-                  fans={data.evaporatorFans} 
-                  label="Испаритель" 
-                />
-                <p className="text-center text-sm text-muted-foreground mt-3 font-medium">
-                  {data.n_V_isp} из {data.kUM2_isp}
-                </p>
-              </div>
-              <div className="flex-shrink-0">
-                <FanIndicator 
-                  fans={data.compressorFans} 
-                  label="Компрессор" 
-                />
-                <p className="text-center text-sm text-muted-foreground mt-3 font-medium">
-                  {data.n_V_cmp} из {data.kUM3_cmp}
-                </p>
-              </div>
+          <div className="space-y-6">
+            <div>
+              <FanIndicator 
+                fans={data.condenserFans} 
+                label="Конденсатор" 
+              />
+              <p className="text-center text-sm text-muted-foreground mt-3 font-medium">
+                {data.n_V_cnd} из {data.kUM1_cnd}
+              </p>
+            </div>
+            <div>
+              <FanIndicator 
+                fans={data.evaporatorFans} 
+                label="Испаритель" 
+              />
+              <p className="text-center text-sm text-muted-foreground mt-3 font-medium">
+                {data.n_V_isp} из {data.kUM2_isp}
+              </p>
+            </div>
+            <div>
+              <FanIndicator 
+                fans={data.compressorFans} 
+                label="Компрессор" 
+              />
+              <p className="text-center text-sm text-muted-foreground mt-3 font-medium">
+                {data.n_V_cmp} из {data.kUM3_cmp}
+              </p>
             </div>
           </div>
         </Card>
