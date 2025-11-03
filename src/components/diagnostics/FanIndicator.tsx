@@ -31,7 +31,7 @@ export const FanIndicator = ({ fans, label, layout = 'vertical' }: FanIndicatorP
       <div className={cn(
         "gap-2 sm:gap-3 md:gap-4 mx-auto",
         layout === 'horizontal' 
-          ? "flex justify-center items-start"
+          ? "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 justify-items-center max-w-fit"
           : "flex flex-wrap justify-center"
       )}>
         {fans.map((fan) => (
