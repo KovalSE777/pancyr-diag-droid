@@ -275,7 +275,8 @@ const Diagnostics = () => {
             <div>
               <FanIndicator 
                 fans={data.condenserFans} 
-                label="Конденсатор" 
+                label="Конденсатор"
+                layout="horizontal"
               />
               <p className="text-center text-sm text-muted-foreground mt-3 font-medium">
                 {data.n_V_cnd} из {data.kUM1_cnd}

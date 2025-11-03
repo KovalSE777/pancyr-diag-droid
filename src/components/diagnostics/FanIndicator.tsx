@@ -5,9 +5,10 @@ import { cn } from "@/lib/utils";
 interface FanIndicatorProps {
   fans: FanStatus[];
   label: string;
+  layout?: 'horizontal' | 'vertical';
 }
 
-export const FanIndicator = ({ fans, label }: FanIndicatorProps) => {
+export const FanIndicator = ({ fans, label, layout = 'vertical' }: FanIndicatorProps) => {
   const getStatusColor = (status: FanStatus['status']) => {
     switch (status) {
       case 'ok': return 'text-success';
@@ -27,7 +28,12 @@ export const FanIndicator = ({ fans, label }: FanIndicatorProps) => {
   return (
     <div className="space-y-3 flex flex-col items-center">
       <h3 className="text-base sm:text-lg md:text-xl font-bold text-foreground text-center">{label}</h3>
-      <div className="flex flex-wrap justify-center gap-2 sm:gap-3 mx-auto">
+      <div className={cn(
+        "gap-2 sm:gap-3 mx-auto",
+        layout === 'horizontal' 
+          ? "grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 justify-items-center max-w-fit"
+          : "flex flex-wrap justify-center"
+      )}>
         {fans.map((fan) => (
           <div key={fan.id} className="flex flex-col items-center space-y-1.5">
             <div 
